@@ -2,6 +2,8 @@ use super::*;
 
 #[test]
 fn test_replacing_inserts() {
+    // Test that inserting a key that already exists will replace the old value
+
     let mut map = BiMap::default();
 
     let (old_right, old_left) = map.insert(1, 2);
@@ -23,10 +25,16 @@ fn test_replacing_inserts() {
     assert_eq!(map.len(), 1);
     assert_eq!(old_right, Some(2));
     assert_eq!(old_left, Some(2));
+    assert_eq!(map.get_right(&1), Some(&4));
+    assert_eq!(map.get_left(&4), Some(&1));
+    assert_eq!(map.get_right(&2), None);
+    assert_eq!(map.get_left(&2), None);
 }
 
 #[test]
 fn test_get() {
+    // Test that we get correct values from the map
+
     let mut map = BiMap::default();
 
     map.insert(1, 2);
@@ -51,6 +59,8 @@ fn test_get() {
 
 #[test]
 fn test_reinsertion() {
+    // Test that reinserting a mapping that already exists does not change the map
+
     let mut map = BiMap::default();
 
     map.insert(1, 2);
