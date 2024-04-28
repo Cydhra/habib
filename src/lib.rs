@@ -237,6 +237,28 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         self.right_index[mapping_index] = bucket_index;
     }
 
+    /// Delete a mapping in the left index and move following elements to the right if necessary.
+    fn delete_mapping_left(&mut self, mapping_index: usize) {
+        self.left_index[mapping_index] = EMPTY_SLOT;
+        let mut current_mapping_index = (mapping_index + 1) % self.current_capacity();
+
+        // move elements over until we find a free spot or an element that is already in the right spot
+        let mut current_neighbor = self.left_index[current_mapping_index];
+
+        while current_neighbor != EMPTY_SLOT && self.get_ideal_index_left(&self.data[current_neighbor].left).wrapping_sub(current_mapping_index) != 0 {
+            if current_mapping_index == 0 {
+                let (lower, upper) = self.left_index.split_at_mut(self.current_capacity() - 1);
+                mem::swap(&mut lower[0], &mut upper[0]);
+            } else {
+                let (lower, upper) = self.left_index.split_at_mut(current_mapping_index);
+                mem::swap(&mut lower[current_mapping_index - 1], &mut upper[0]);
+            }
+            current_mapping_index = (current_mapping_index + 1) % self.current_capacity();
+            current_neighbor = self.left_index[current_mapping_index];
+        }
+    }
+
+    /// Get the current capacity for both indices.
     fn current_capacity(&self) -> usize {
         self.left_index.len()
     }
@@ -258,6 +280,10 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
             if let Ok(right_meta_index) = right_index {
                 let right_bucket = self.right_index[right_meta_index];
                 if left_bucket != right_bucket {
+                    // delete the mapping for the left element of this bucket
+                    self.delete_mapping_left(self.lookup_index_left(&self.data[right_bucket].left).unwrap());
+
+                    // delete the right bucket
                     let bucket = self.delete_bucket(right_bucket);
 
                     // update the right index mapping to the left bucket that will be replaced
