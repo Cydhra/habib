@@ -24,3 +24,27 @@ fn test_replacing_inserts() {
     assert_eq!(old_right, Some(2));
     assert_eq!(old_left, Some(2));
 }
+
+#[test]
+fn test_get() {
+    let mut map = BiMap::default();
+
+    map.insert(1, 2);
+    map.insert(2, 3);
+
+    assert_eq!(map.get_right(&0), None);
+    assert_eq!(map.get_left(&0), None);
+
+    assert_eq!(map.get_right(&1), Some(&2));
+    assert_eq!(map.get_right(&2), Some(&3));
+    assert_eq!(map.get_left(&2), Some(&1));
+    assert_eq!(map.get_left(&3), Some(&2));
+
+    map.insert(1, 3);
+
+    assert_eq!(map.get_right(&1), Some(&3));
+    assert_eq!(map.get_left(&3), Some(&1));
+
+    assert_eq!(map.get_right(&2), None);
+    assert_eq!(map.get_left(&2), None);
+}

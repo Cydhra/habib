@@ -263,6 +263,24 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         self.left_index.len()
     }
 
+    /// Get the right value for the given left value. If the left value is not in the map, None is
+    /// returned.
+    #[must_use]
+    pub fn get_right(&self, left: &T) -> Option<&U> {
+        self.lookup_index_left(left)
+            .ok()
+            .map(|index| &self.data[self.left_index[index]].right)
+    }
+
+    /// Get the left value for the given right value. If the right value is not in the map, None is
+    /// returned.
+    #[must_use]
+    pub fn get_left(&self, right: &U) -> Option<&T> {
+        self.lookup_index_right(right)
+            .ok()
+            .map(|index| &self.data[self.right_index[index]].left)
+    }
+
     pub fn insert(&mut self, left: T, right: U) -> (Option<U>, Option<T>) {
         // TODO check if the map is near full and resize if necessary
 
