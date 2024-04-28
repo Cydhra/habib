@@ -281,6 +281,16 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
             .map(|index| &self.data[self.right_index[index]].left)
     }
 
+    /// Check if the map contains a mapping for the given left value.
+    pub fn contains_left(&self, left: &T) -> bool {
+        self.lookup_index_left(left).is_ok()
+    }
+
+    /// Check if the map contains a mapping for the given right value.
+    pub fn contains_right(&self, right: &U) -> bool {
+        self.lookup_index_right(right).is_ok()
+    }
+
     pub fn insert(&mut self, left: T, right: U) -> (Option<U>, Option<T>) {
         // TODO check if the map is near full and resize if necessary
 
@@ -298,13 +308,13 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
             if let Ok(right_meta_index) = right_index {
                 let right_bucket = self.right_index[right_meta_index];
                 if left_bucket != right_bucket {
-                    // delete the mapping for the left element of this bucket
+                    // delete the left mapping for this bucket, since we delete it
                     self.delete_mapping_left(self.lookup_index_left(&self.data[right_bucket].left).unwrap());
 
                     // delete the right bucket
                     let bucket = self.delete_bucket(right_bucket);
 
-                    // update the right index mapping to the left bucket that will be replaced
+                    // update the right mapping to the left bucket that will be replaced
                     self.update_mapping_right(right_meta_index, left_bucket);
                     old_left = Some(bucket.left);
                 } else {
@@ -312,11 +322,12 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
                     return (Some(right), Some(left));
                 }
             } else {
-                // insert a new mapping for the right value
+                // insert a new mapping for the right value, since it does not exist
                 self.insert_mapping_right(right_index.unwrap_err(), left_bucket);
             }
 
-            // replace left bucket with new bucket, no update to left index necessary
+            // replace left bucket with new bucket, no update to left index necessary, since it
+            // already points to this bucket
             let bucket = self.replace_bucket(left_bucket, Bucket { left, right });
             old_right = Some(bucket.right);
         } else if let Ok(right_meta_index) = right_index {
