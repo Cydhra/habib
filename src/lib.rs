@@ -167,19 +167,18 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
             return self.data.pop().unwrap();
         }
 
+        // find metadata of the bucket to move
+        let bucket_to_move = &self.data[self.len() - 1];
+        let left_index = self.lookup_index_left(&bucket_to_move.left);
+        let right_index = self.lookup_index_right(&bucket_to_move.right);
+        debug_assert!(left_index.is_ok());
+        debug_assert!(right_index.is_ok());
+
         let tail = self.len() - 1;
         let (lower, upper) = self.data.split_at_mut(tail);
 
         // swap with last element
         mem::swap(&mut lower[bucket_index], &mut upper[0]);
-
-        // update metadata of moved bucket
-        let moved_bucket = &self.data[bucket_index];
-        let left_index = self.lookup_index_left(&moved_bucket.left);
-        let right_index = self.lookup_index_right(&moved_bucket.right);
-
-        debug_assert!(left_index.is_ok());
-        debug_assert!(right_index.is_ok());
 
         // update metadata of moved bucket
         self.left_index[left_index.unwrap()] = bucket_index;
