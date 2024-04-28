@@ -282,15 +282,32 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     }
 
     /// Check if the map contains a mapping for the given left value.
+    #[must_use]
     pub fn contains_left(&self, left: &T) -> bool {
         self.lookup_index_left(left).is_ok()
     }
 
     /// Check if the map contains a mapping for the given right value.
+    #[must_use]
     pub fn contains_right(&self, right: &U) -> bool {
         self.lookup_index_right(right).is_ok()
     }
 
+    /// Inserts a value pair into the map, creating a bijection between the two values.
+    /// If the map did have one key present, its value is updated and the old value is returned.
+    /// If a key did not exist, None is returned instead.
+    /// The first return value is the old right value assigned to the left key, and vice versa.
+    /// The map assumes that keys never return true for `==` if they are not identical.
+    /// It is a logical error to insert a key into the map that is equal (`==`) to a key that is
+    /// already in the map, but not identical.
+    ///
+    /// If the map is near full, it will resize itself.
+    /// The map will never shrink itself.
+    ///
+    /// If both the left and right values already exist in the map, but are not mapped to each other,
+    /// both mappings will be updated, which will reduce the number of mappings by one (see [`len`]).
+    ///
+    /// [`len`]: #method.len
     pub fn insert(&mut self, left: T, right: U) -> (Option<U>, Option<T>) {
         // TODO check if the map is near full and resize if necessary
 
@@ -347,7 +364,7 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         (old_right, old_left)
     }
 
-    /// Returns the number of bijections stored in the map, meaning it is half the number of elements.
+    /// Returns the number of bijections stored in the map, meaning it is half the number of values.
     pub fn len(&self) -> usize {
         self.data.len()
     }
