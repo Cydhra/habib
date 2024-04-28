@@ -351,6 +351,11 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     pub fn len(&self) -> usize {
         self.data.len()
     }
+
+    /// Returns true if the map is empty.
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
 }
 
 #[cfg(test)]
