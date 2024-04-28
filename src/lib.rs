@@ -213,7 +213,7 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     /// Insert metadata into the left index for the given element and bucket index.
     ///
     /// # Parameters
-    /// * `mapping_index` - The index in the left index to insert at. It must be the index returnedd
+    /// * `mapping_index` - The index in the left index to insert at. It must be the index returned
     /// by the `lookup_index_left` method. The method will move all elements to the right until an
     /// empty slot is found.
     /// * `bucket_index` - The index of the bucket to insert.
@@ -373,14 +373,14 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         } else if let Ok(right_meta_index) = right_index {
             let right_bucket = self.right_index[right_meta_index];
 
+            // insert mapping to the left index, no update to right index necessary.
+            self.insert_mapping_left(left_index.unwrap_err(), right_bucket);
+
             // replace the right bucket with the new bucket, and delete the left mapping to it,
             // since we insert a new left mapping for the new value
             self.delete_mapping_left(self.lookup_index_left(&self.data[right_bucket].left).unwrap());
             let bucket = self.replace_bucket(right_bucket, Bucket { left, right });
             old_left = Some(bucket.left);
-
-            // insert mapping to the left index, no update to right index necessary
-            self.insert_mapping_left(left_index.unwrap_err(), right_bucket);
         } else {
             self.push_new_bucket(Bucket { left, right });
 
