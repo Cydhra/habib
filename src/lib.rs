@@ -258,6 +258,27 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         }
     }
 
+    /// Delete a mapping in the right index and move following elements to the right if necessary.
+    fn delete_mapping_right(&mut self, mapping_index: usize) {
+        self.right_index[mapping_index] = EMPTY_SLOT;
+        let mut current_mapping_index = (mapping_index + 1) % self.current_capacity();
+
+        // move elements over until we find a free spot or an element that is already in the right spot
+        let mut current_neighbor = self.right_index[current_mapping_index];
+
+        while current_neighbor != EMPTY_SLOT && self.get_ideal_index_right(&self.data[current_neighbor].right).wrapping_sub(current_mapping_index) != 0 {
+            if current_mapping_index == 0 {
+                let (lower, upper) = self.right_index.split_at_mut(self.current_capacity() - 1);
+                mem::swap(&mut lower[0], &mut upper[0]);
+            } else {
+                let (lower, upper) = self.right_index.split_at_mut(current_mapping_index);
+                mem::swap(&mut lower[current_mapping_index - 1], &mut upper[0]);
+            }
+            current_mapping_index = (current_mapping_index + 1) % self.current_capacity();
+            current_neighbor = self.right_index[current_mapping_index];
+        }
+    }
+
     /// Get the current capacity for both indices.
     fn current_capacity(&self) -> usize {
         self.left_index.len()
@@ -388,6 +409,46 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
             Ok(())
         } else {
             Err((left_index.ok().map(|index| &self.data[self.left_index[index]].right), right_index.ok().map(|index| &self.data[self.right_index[index]].left)))
+        }
+    }
+
+    /// Deletes the mappings for the given left value and returns the right value that was mapped to it.
+    /// If the left value is not in the map, None is returned.
+    pub fn remove_left(&mut self, left: &T) -> Option<U> {
+        let left_index = self.lookup_index_left(left);
+        if let Ok(left_meta_index) = left_index {
+            let bucket = self.left_index[left_meta_index];
+            let right_meta_index = self.lookup_index_right(&self.data[bucket].right).unwrap();
+
+            // delete the right mapping for this bucket
+            self.delete_mapping_left(left_meta_index);
+            self.delete_mapping_right(right_meta_index);
+
+            // delete the bucket
+            let bucket = self.delete_bucket(bucket);
+            Some(bucket.right)
+        } else {
+            None
+        }
+    }
+
+    /// Deletes the mappings for the given right value and returns the left value that was mapped to it.
+    /// If the right value is not in the map, None is returned.
+    pub fn remove_right(&mut self, right: &U) -> Option<T> {
+        let right_index = self.lookup_index_right(right);
+        if let Ok(right_meta_index) = right_index {
+            let bucket = self.right_index[right_meta_index];
+            let left_meta_index = self.lookup_index_left(&self.data[bucket].left).unwrap();
+
+            // delete the left mapping for this bucket
+            self.delete_mapping_left(left_meta_index);
+            self.delete_mapping_right(right_meta_index);
+
+            // delete the bucket
+            let bucket = self.delete_bucket(bucket);
+            Some(bucket.left)
+        } else {
+            None
         }
     }
 
