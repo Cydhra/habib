@@ -365,11 +365,17 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
             }
 
             // replace left bucket with new bucket, no update to left index necessary, since it
-            // already points to this bucket
+            // already points to this bucket. The mapping for the old right value is deleted,
+            // since we insert a new right mapping for the new value
+            self.delete_mapping_right(self.lookup_index_right(&self.data[left_bucket].right).unwrap());
             let bucket = self.replace_bucket(left_bucket, Bucket { left, right });
             old_right = Some(bucket.right);
         } else if let Ok(right_meta_index) = right_index {
             let right_bucket = self.right_index[right_meta_index];
+
+            // replace the right bucket with the new bucket, and delete the left mapping to it,
+            // since we insert a new left mapping for the new value
+            self.delete_mapping_left(self.lookup_index_left(&self.data[right_bucket].left).unwrap());
             let bucket = self.replace_bucket(right_bucket, Bucket { left, right });
             old_left = Some(bucket.left);
 
