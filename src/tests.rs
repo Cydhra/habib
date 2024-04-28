@@ -32,6 +32,45 @@ fn test_replacing_inserts() {
 }
 
 #[test]
+fn test_try_inserts() {
+    // Test that inserting a key that already exists will return an error
+
+    let mut map = BiMap::default();
+
+    let result = map.try_insert(1, 2);
+    assert_eq!(result, Ok(()));
+    assert_eq!(map.len(), 1);
+
+    let result = map.try_insert(2, 3);
+    assert_eq!(result, Ok(()));
+    assert_eq!(map.len(), 2);
+
+    let result = map.try_insert(2, 4);
+    assert_eq!(result, Err((Some(&3), None)));
+    assert_eq!(map.len(), 2);
+
+    let result = map.try_insert(1, 4);
+    assert_eq!(result, Err((Some(&2), None)));
+    assert_eq!(map.len(), 2);
+
+    let result = map.try_insert(0, 2);
+    assert_eq!(result, Err((None, Some(&1))));
+    assert_eq!(map.len(), 2);
+
+    let result = map.try_insert(0, 0);
+    assert_eq!(result, Ok(()));
+    assert_eq!(map.len(), 3);
+
+    let result = map.try_insert(0, 0);
+    assert_eq!(result, Err((Some(&0), Some(&0))));
+    assert_eq!(map.len(), 3);
+
+    let result = map.try_insert(0, 3);
+    assert_eq!(result, Err((Some(&0), Some(&2))));
+    assert_eq!(map.len(), 3);
+}
+
+#[test]
 fn test_get() {
     // Test that we get correct values from the map
 

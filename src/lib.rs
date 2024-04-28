@@ -364,6 +364,33 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         (old_right, old_left)
     }
 
+    /// Tries to insert a value pair into the map, creating a bijection between the two values.
+    /// If the map already had one of the values present, nothing is updated, and an error containing
+    /// the present values is returned. The first value in the tuple is the present right value for the
+    /// left key, and the second value is the present left value for the right key.
+    /// If the map did not have any of the values present, the values are inserted and Ok is returned.
+    ///
+    /// If the map is near full, it will resize itself.
+    // TODO adjust this method to mirror HashMap::try_insert (when it gets stabilized)
+    //  this includes changing the Err to an occupied error type,
+    //  and changing the name if Rust decides that try_ should be reserved to allocation errors
+    pub fn try_insert(&mut self, left: T, right: U) -> Result<(), (Option<&U>, Option<&T>)> {
+        // TODO check if the map is near full and resize if necessary
+
+        let left_index = self.lookup_index_left(&left);
+        let right_index = self.lookup_index_right(&right);
+
+        if left_index.is_err() && right_index.is_err() {
+            self.push_new_bucket(Bucket { left, right });
+
+            self.insert_mapping_left(left_index.unwrap_err(), self.len() - 1);
+            self.insert_mapping_right(right_index.unwrap_err(), self.len() - 1);
+            Ok(())
+        } else {
+            Err((left_index.ok().map(|index| &self.data[self.left_index[index]].right), right_index.ok().map(|index| &self.data[self.right_index[index]].left)))
+        }
+    }
+
     /// Returns the number of bijections stored in the map, meaning it is half the number of values.
     pub fn len(&self) -> usize {
         self.data.len()
