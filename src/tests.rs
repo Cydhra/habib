@@ -48,3 +48,27 @@ fn test_get() {
     assert_eq!(map.get_right(&2), None);
     assert_eq!(map.get_left(&2), None);
 }
+
+#[test]
+fn test_reinsertion() {
+    let mut map = BiMap::default();
+
+    map.insert(1, 2);
+    map.insert(2, 3);
+
+    assert_eq!(map.len(), 2);
+    assert_eq!(map.get_right(&1), Some(&2));
+    assert_eq!(map.get_left(&2), Some(&1));
+    assert_eq!(map.get_right(&2), Some(&3));
+    assert_eq!(map.get_left(&3), Some(&2));
+
+    let (old_right, old_left) = map.insert(1, 2);
+    assert_eq!(old_left, Some(1));
+    assert_eq!(old_right, Some(2));
+
+    assert_eq!(map.len(), 2);
+    assert_eq!(map.get_right(&1), Some(&2));
+    assert_eq!(map.get_left(&2), Some(&1));
+    assert_eq!(map.get_right(&2), Some(&3));
+    assert_eq!(map.get_left(&3), Some(&2));
+}
