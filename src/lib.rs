@@ -359,7 +359,7 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
             if let Ok(right_meta_index) = right_index {
                 let right_bucket = self.right_index[right_meta_index];
                 if left_bucket != right_bucket {
-                    // delete the right mapping for the left bucket, since we will overwrite the value
+                    // delete the right mapping for the left bucket, since we will overwrite its right value
                     // with the new right value. Delete it only when left_bucket != right_bucket.
                     // MUST be deleted BEFORE we call update_mapping_right below, otherwise the searching
                     // functions will not find the right bucket.

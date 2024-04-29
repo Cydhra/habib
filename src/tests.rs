@@ -373,7 +373,6 @@ fn test_collisions_wrapping() {
 fn test_collisions_replacement() {
     // test that the map works correctly when two values are inserted with the same hash,
     // and then some of them are replaced by a new insertion
-
     let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
 
     map.insert(1, 2);
@@ -384,4 +383,23 @@ fn test_collisions_replacement() {
     assert_eq!(map.get_left(&3), Some(&1));
     assert_eq!(map.get_right(&31), None);
     assert_eq!(map.get_left(&2), None);
+
+    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+
+    map.insert(1, 2);
+    map.insert(31, 3);
+    map.insert(1, 4);
+
+    assert_eq!(map.get_right(&1), Some(&4));
+    assert_eq!(map.get_left(&4), Some(&1));
+    assert_eq!(map.get_right(&31), Some(&3));
+    assert_eq!(map.get_left(&3), Some(&31));
+    assert_eq!(map.get_right(&2), None);
+
+    map.insert(31, 5);
+
+    assert_eq!(map.get_right(&1), Some(&4));
+    assert_eq!(map.get_left(&4), Some(&1));
+    assert_eq!(map.get_right(&31), Some(&5));
+    assert_eq!(map.get_left(&5), Some(&31));
 }
