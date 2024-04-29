@@ -7,7 +7,7 @@ const EMPTY_SLOT: usize = usize::MAX;
 
 // TODO instead of linear searching, use smart search from https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=4568152
 /// A bi-directional map.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BiMap<T, U, H = RandomState, RH = RandomState>
     where T: Hash + Eq, U: Hash + Eq
 {
@@ -19,7 +19,7 @@ pub struct BiMap<T, U, H = RandomState, RH = RandomState>
     reverse_hasher: RH,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Bucket<T, U> {
     left: T,
     right: U,
@@ -172,6 +172,11 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
 
     /// Delete a bucket at the given index. It will update one entry in each index, since
     /// the last bucket is moved to the deleted bucket's position.
+    ///
+    /// Note: If the bucket to delete is NOT the last bucket, the last bucket will move, meaning
+    /// that the indices of the moved bucket are no longer valid. This method ensures the mappings
+    /// are updated correctly, but any temporary variables that hold the indices of the moved bucket
+    /// will be invalid.
     fn delete_bucket(&mut self, bucket_index: usize) -> Bucket<T, U> {
         assert!(bucket_index < self.len(), "index out of bounds");
 
@@ -352,14 +357,16 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         let mut old_left = None;
 
         if let Ok(left_meta_index) = left_index {
-            let left_bucket = self.left_index[left_meta_index];
+            // the bucket where the left element is currently stored, henceforth "the left bucket".
+            let mut left_bucket = self.left_index[left_meta_index];
 
             // delete the right bucket if it exists and store the old left value
             // unless the right bucket is the same as the left bucket
             if let Ok(right_meta_index) = right_index {
+                // the bucket where the right index is currently stored, henceforth "the right bucket".
                 let right_bucket = self.right_index[right_meta_index];
                 if left_bucket != right_bucket {
-                    // delete the right mapping for the left bucket, since we will overwrite its right value
+                    // delete the right mapping for the left bucket, since we will overwrite its current right value
                     // with the new right value. Delete it only when left_bucket != right_bucket.
                     // MUST be deleted BEFORE we call update_mapping_right below, otherwise the searching
                     // functions will not find the right bucket.

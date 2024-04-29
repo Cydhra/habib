@@ -464,3 +464,30 @@ fn test_multi_collision() {
         }
     }
 }
+
+#[test]
+fn test_move_bucket_during_replacement() {
+    // test whether buckets are replaced correctly, if they move during the operation.
+    // this can happen if an insert overwrites two mappings, and the right mapping is not the last
+    // mapping in the mapping vector, but the left mapping is. In that case the left mapping will
+    // be moved to the place of the right mapping, which can confuse the insert operation.
+
+    let mut map = BiMap::default();
+
+    map.insert(1, 2);
+    map.insert(3, 4);
+
+    // verify the data structure looks like the test expects, otherwise the test case is broken
+    assert_eq!(map.data[0], Bucket { left: 1, right: 2 });
+    assert_eq!(map.data[1], Bucket { left: 3, right: 4 });
+
+    map.insert(3, 2);
+
+    // verify the data structure looks like the test expects, otherwise the test case is broken
+    assert_eq!(map.data[0], Bucket { left: 3, right: 2 });
+
+    assert_eq!(map.get_right(&1), None);
+    assert_eq!(map.get_right(&3), Some(&2));
+    assert_eq!(map.get_left(&2), Some(&3));
+    assert_eq!(map.get_left(&4), None);
+}
