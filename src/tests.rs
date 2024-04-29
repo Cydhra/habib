@@ -1,5 +1,35 @@
 use super::*;
 
+/// A hasher that simply returns the first byte of the input as the hash, for testing purposes
+struct IdentityHasher {
+    modulus: u8,
+    state: u8,
+}
+
+impl Hasher for IdentityHasher {
+    fn finish(&self) -> u64 {
+        self.state as u64
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        self.state = bytes.iter().find(|&&b| b != 0).or(Some(&0)).map(|&b| b % self.modulus).unwrap();
+    }
+}
+
+impl Default for IdentityHasher {
+    fn default() -> Self {
+        IdentityHasher { modulus: DEFAULT_CAPACITY as u8, state: 0 }
+    }
+}
+
+impl BuildHasher for IdentityHasher {
+    type Hasher = IdentityHasher;
+
+    fn build_hasher(&self) -> Self::Hasher {
+        IdentityHasher::default()
+    }
+}
+
 #[test]
 fn test_replacing_inserts() {
     // Test that inserting a key that already exists will replace the old value
@@ -215,5 +245,143 @@ fn test_insert_after_delete() {
     assert_eq!(map.get_right(&1), Some(&3));
     assert_eq!(map.get_left(&3), Some(&1));
     assert_eq!(map.get_right(&2), None);
+    assert_eq!(map.get_left(&2), None);
+}
+
+#[test]
+fn test_collisions() {
+    // Test that the map works correctly when two values are inserted with the same hash
+
+    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+
+    // verify the test is working as expected
+    assert_eq!(map.get_ideal_index_left(&1), map.get_ideal_index_left(&(DEFAULT_CAPACITY + 1)));
+
+    // insert colliding values
+    map.insert(1, 2);
+    map.insert(DEFAULT_CAPACITY + 1, 3);
+    map.insert(2 * DEFAULT_CAPACITY + 1, 4);
+
+    assert_eq!(map.get_right(&1), Some(&2));
+    assert_eq!(map.get_left(&2), Some(&1));
+    assert_eq!(map.get_right(&(DEFAULT_CAPACITY + 1)), Some(&3));
+    assert_eq!(map.get_left(&3), Some(&(DEFAULT_CAPACITY + 1)));
+    assert_eq!(map.get_right(&(2 * DEFAULT_CAPACITY + 1)), Some(&4));
+    assert_eq!(map.get_left(&4), Some(&(2 * DEFAULT_CAPACITY + 1)));
+
+    // remove last collision
+    map.remove_left(&(2 * DEFAULT_CAPACITY + 1));
+
+    // verify other values are still present
+    assert_eq!(map.get_right(&1), Some(&2));
+    assert_eq!(map.get_left(&2), Some(&1));
+    assert_eq!(map.get_right(&(DEFAULT_CAPACITY + 1)), Some(&3));
+    assert_eq!(map.get_left(&3), Some(&(DEFAULT_CAPACITY + 1)));
+
+    // verify deleted values are gone
+    assert_eq!(map.get_right(&(2 * DEFAULT_CAPACITY + 1)), None);
+    assert_eq!(map.get_left(&4), None);
+
+    // reinsert last collision
+    map.insert(2 * DEFAULT_CAPACITY + 1, 4);
+
+    // remove second collision
+    map.remove_left(&(DEFAULT_CAPACITY + 1));
+
+    // verify other values are still present
+    assert_eq!(map.get_right(&1), Some(&2));
+    assert_eq!(map.get_left(&2), Some(&1));
+    assert_eq!(map.get_right(&(2 * DEFAULT_CAPACITY + 1)), Some(&4));
+    assert_eq!(map.get_left(&4), Some(&(2 * DEFAULT_CAPACITY + 1)));
+
+    // verify deleted values are gone
+    assert_eq!(map.get_right(&(DEFAULT_CAPACITY + 1)), None);
+    assert_eq!(map.get_left(&3), None);
+}
+
+#[test]
+fn test_collisions_wrapping() {
+    // test that the map works correctly when two values are inserted with the same hash,
+    // and the index for linear probing wraps around the end of the array
+
+    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+
+    // verify the test is working as expected
+    assert_eq!(map.get_ideal_index_left(&31), 31);
+    assert_eq!(map.get_ideal_index_left(&(DEFAULT_CAPACITY + 31)), 31);
+
+    map.insert(31, 2);
+
+    // verify this hasn't wrapped around
+    assert_eq!(map.left_index[0], EMPTY_SLOT);
+
+    // insert colliding values, one of which should end up at index 0 of the mapping
+    map.insert(DEFAULT_CAPACITY + 31, 3);
+
+    // verify wrap-around
+    assert_ne!(map.left_index[0], EMPTY_SLOT);
+    assert_eq!(map.left_index[1], EMPTY_SLOT);
+
+    // insert second colliding value
+    map.insert(2 * DEFAULT_CAPACITY + 31, 4);
+
+    // verify wrap-around
+    assert_ne!(map.left_index[1], EMPTY_SLOT);
+
+    // verify the values are recovered correctly
+    assert_eq!(map.get_right(&31), Some(&2));
+    assert_eq!(map.get_left(&2), Some(&31));
+    assert_eq!(map.get_right(&(DEFAULT_CAPACITY + 31)), Some(&3));
+    assert_eq!(map.get_left(&3), Some(&(DEFAULT_CAPACITY + 31)));
+    assert_eq!(map.get_right(&(2 * DEFAULT_CAPACITY + 31)), Some(&4));
+    assert_eq!(map.get_left(&4), Some(&(2 * DEFAULT_CAPACITY + 31)));
+
+    // remove last collision
+    map.remove_left(&(2 * DEFAULT_CAPACITY + 31));
+
+    // verify other values are still present
+    assert_eq!(map.get_right(&31), Some(&2));
+    assert_eq!(map.get_left(&2), Some(&31));
+    assert_eq!(map.get_right(&(DEFAULT_CAPACITY + 31)), Some(&3));
+    assert_eq!(map.get_left(&3), Some(&(DEFAULT_CAPACITY + 31)));
+
+    // verify deleted values are gone
+    assert_eq!(map.get_right(&(2 * DEFAULT_CAPACITY + 31)), None);
+    assert_eq!(map.get_left(&4), None);
+
+    // reinsert last collision
+    map.insert(2 * DEFAULT_CAPACITY + 31, 4);
+
+    assert_ne!(map.left_index[0], EMPTY_SLOT);
+    assert_ne!(map.left_index[1], EMPTY_SLOT);
+
+    // remove second collision
+    map.remove_left(&(DEFAULT_CAPACITY + 31));
+
+    // verify other values are still present
+    assert_eq!(map.get_right(&31), Some(&2));
+    assert_eq!(map.get_left(&2), Some(&31));
+    assert_eq!(map.get_right(&(2 * DEFAULT_CAPACITY + 31)), Some(&4));
+    assert_eq!(map.get_left(&4), Some(&(2 * DEFAULT_CAPACITY + 31)));
+
+    // verify deleted values are gone
+    assert_eq!(map.get_right(&(DEFAULT_CAPACITY + 31)), None);
+    assert_eq!(map.get_left(&3), None);
+}
+
+#[test]
+fn test_collisions_replacement() {
+    // test that the map works correctly when two values are inserted with the same hash,
+    // and then some of them are replaced by a new insertion
+
+    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+
+    map.insert(1, 2);
+    map.insert(31, 3);
+    map.insert(1, 3);
+
+    assert_eq!(map.get_right(&1), Some(&3));
+    assert_eq!(map.get_left(&3), Some(&1));
+    assert_eq!(map.get_right(&31), None);
     assert_eq!(map.get_left(&2), None);
 }
