@@ -58,6 +58,19 @@ impl<T, U> BiMap<T, U>
 impl<T, U, H, RH> BiMap<T, U, H, RH>
     where T: Hash + Eq, U: Hash + Eq, H: BuildHasher, RH: BuildHasher
 {
+    /// Create a new empty BiMap with the given capacity and hashers.
+    pub fn with_hashers(capacity: usize, hasher: H, reverse_hasher: RH) -> Self {
+        let left_index = vec![EMPTY_SLOT; capacity].into_boxed_slice();
+        let right_index = vec![EMPTY_SLOT; capacity].into_boxed_slice();
+        BiMap {
+            data: Vec::with_capacity(capacity),
+            left_index,
+            right_index,
+            hasher,
+            reverse_hasher,
+        }
+    }
+
     /// Get the ideal index (i.e. without collisions) for a left value under the current
     /// container size.
     #[inline(always)]
