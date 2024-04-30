@@ -531,3 +531,23 @@ fn test_clear() {
     assert_eq!(map.get_right(&3), None);
     assert_eq!(map.get_left(&4), None);
 }
+
+#[test]
+fn test_growing() {
+    // test whether the map grows correctly
+    let mut map = BiMap::with_capacity(10);
+
+    let initial_capacity = map.current_capacity();
+
+    // insert more than capacity elements
+    for i in 0..40 {
+        map.insert(i, i + 1);
+    }
+
+    for i in 0..40 {
+        assert_eq!(map.get_right(&i), Some(&(i + 1)));
+        assert_eq!(map.get_left(&(i + 1)), Some(&i));
+    }
+
+    assert!(map.current_capacity() > initial_capacity);
+}

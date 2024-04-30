@@ -3,6 +3,10 @@ use std::mem;
 
 const DEFAULT_CAPACITY: usize = 32;
 
+const GROWTH_FACTOR: f64 = 2.0;
+
+const MAX_LOAD_FACTOR: f64 = 0.9;
+
 const EMPTY_SLOT: usize = usize::MAX;
 
 // TODO instead of linear searching, use smart search from https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=4568152
@@ -41,7 +45,7 @@ impl<T, U> BiMap<T, U>
 
     /// Create a new empty BiMap with the given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
-        let capacity = capacity.next_power_of_two();
+        let capacity = (capacity as f64 / MAX_LOAD_FACTOR).ceil() as usize;
         let left_index = vec![EMPTY_SLOT; capacity].into_boxed_slice();
         let right_index = vec![EMPTY_SLOT; capacity].into_boxed_slice();
         BiMap {
@@ -93,6 +97,42 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         Self::hash_to_index(&self.reverse_hasher, right, self.current_capacity())
     }
 
+    /// Perform the probing algorithm on the given hash index to find the index of the element.
+    /// This method is used for both left and right values, and requires the ideal index function
+    /// and the lookup function to be passed in. It is not intended to be called directly, but rather
+    /// through the lookup_index_left and lookup_index_right methods, or during rehashing.
+    ///
+    /// # Parameters
+    /// * `element` - The element for which to find the index.
+    /// * `hash_index` - The hash index to probe.
+    /// * `hasher` - The hasher to use.
+    /// * `lookup` - A function that returns elements of the element type from a bucket.
+    /// * `buckets` - The buckets that contain the elements.
+    /// * `capacity` - The capacity of the hash index.
+    #[inline(always)]
+    fn probe_index<E, G>(element: &E, hash_index: &[usize], hasher: &G, lookup: fn(&Bucket<T, U>) -> &E, buckets: &[Bucket<T, U>], capacity: usize) -> Result<usize, usize>
+        where E: Hash + Eq, G: BuildHasher
+    {
+        let ideal_index = Self::hash_to_index(hasher, element, capacity);
+        let mut index = ideal_index;
+        let mut dist = 0;
+        while hash_index[index] < EMPTY_SLOT {
+            let bucket = &buckets[hash_index[index]];
+            if lookup(bucket) == element {
+                return Ok(index);
+            } else {
+                let target_probe_dist = index.wrapping_sub(Self::hash_to_index(hasher, lookup(bucket), capacity)).rem_euclid(capacity);
+                if dist > target_probe_dist {
+                    return Err(index);
+                }
+            }
+
+            index = (index + 1) % capacity;
+            dist += 1;
+        }
+        Err(index)
+    }
+
     /// Look up the index of an element in the map. This method is used for both left and right
     /// values, and requires the ideal index function and the lookup function to be passed in.
     /// It is not intended to be called directly, but rather through the lookup_index_left and
@@ -110,27 +150,10 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     /// # Panics
     /// This method panics if the map is full.
     #[inline(always)]
-    fn lookup_index<E>(&self, element: &E, hash_index: &[usize], ideal_index_func: fn(&Self, &E) -> usize, lookup: fn(&Bucket<T, U>) -> &E) -> Result<usize, usize>
-        where E: Hash + Eq
+    fn lookup_index<E, G>(&self, element: &E, hash_index: &[usize], hasher: &G, lookup: fn(&Bucket<T, U>) -> &E) -> Result<usize, usize>
+        where E: Hash + Eq, G: BuildHasher
     {
-        let ideal_index = ideal_index_func(&self, element);
-        let mut index = ideal_index;
-        let mut dist = 0;
-        while hash_index[index] < EMPTY_SLOT {
-            let bucket = &self.data[hash_index[index]];
-            if lookup(bucket) == element {
-                return Ok(index);
-            } else {
-                let target_probe_dist = index.wrapping_sub(ideal_index_func(&self, lookup(bucket))).rem_euclid(self.current_capacity());
-                if dist > target_probe_dist {
-                    return Err(index);
-                }
-            }
-
-            index = (index + 1) % self.current_capacity();
-            dist += 1;
-        }
-        Err(index)
+        Self::probe_index(element, hash_index, hasher, lookup, &self.data, self.current_capacity())
     }
 
     /// Find the index that the left value is stored at or would be stored at. If the left value
@@ -147,7 +170,7 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     /// # Panics
     /// This method panics if the map is full.
     fn lookup_index_left(&self, left: &T) -> Result<usize, usize> {
-        self.lookup_index(left, &self.left_index, Self::get_ideal_index_left, |bucket: &Bucket<T, U>| &bucket.left)
+        self.lookup_index(left, &self.left_index, &self.hasher, |bucket: &Bucket<T, U>| &bucket.left)
     }
 
     /// Find the index that the right value is stored at or would be stored at. If the right value
@@ -164,7 +187,7 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     /// # Panics
     /// This method panics if the map is full.
     fn lookup_index_right(&self, right: &U) -> Result<usize, usize> {
-        self.lookup_index(right, &self.right_index, Self::get_ideal_index_right, |bucket: &Bucket<T, U>| &bucket.right)
+        self.lookup_index(right, &self.right_index, &self.reverse_hasher, |bucket: &Bucket<T, U>| &bucket.right)
     }
 
     /// Push a new bucket to the tail of the data array. This method is used when both left and right
@@ -336,6 +359,28 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         self.left_index.len()
     }
 
+    /// Returns whether the map can fit additional `num` elements without exceeding the maximum load.
+    fn can_fit(&self, num: usize) -> bool {
+        (self.len() + num) < (self.current_capacity() as f64 * MAX_LOAD_FACTOR).floor() as usize
+    }
+
+    /// Grow the map according to the growth factor.
+    fn grow(&mut self) {
+        let mut new_left_index = vec![EMPTY_SLOT; (self.current_capacity() as f64 * GROWTH_FACTOR).ceil() as usize].into_boxed_slice();
+        let mut new_right_index = vec![EMPTY_SLOT; (self.current_capacity() as f64 * GROWTH_FACTOR).ceil() as usize].into_boxed_slice();
+
+        for (bucket_index, bucket) in self.data.iter().enumerate() {
+            let left_element_index = Self::probe_index(&bucket.left, &new_left_index, &self.hasher, |bucket: &Bucket<T, U>| &bucket.left, &self.data[..bucket_index], new_left_index.len()).unwrap_err();
+            let right_element_index = Self::probe_index(&bucket.right, &new_right_index, &self.reverse_hasher, |bucket: &Bucket<T, U>| &bucket.right, &self.data[..bucket_index], new_right_index.len()).unwrap_err();
+
+            Self::insert_mapping(&mut new_left_index, left_element_index, bucket_index);
+            Self::insert_mapping(&mut new_right_index, right_element_index, bucket_index);
+        }
+
+        self.left_index = new_left_index;
+        self.right_index = new_right_index;
+    }
+
     /// Get the right value for the given left value. If the left value is not in the map, None is
     /// returned.
     #[must_use]
@@ -382,7 +427,9 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     ///
     /// [`len`]: #method.len
     pub fn insert(&mut self, left: T, right: U) -> (Option<U>, Option<T>) {
-        // TODO check if the map is near full and resize if necessary
+        if !self.can_fit(1) {
+            self.grow();
+        }
 
         let left_index = self.lookup_index_left(&left);
         let right_index = self.lookup_index_right(&right);
@@ -455,12 +502,14 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     //  this includes changing the Err to an occupied error type,
     //  and changing the name if Rust decides that try_ should be reserved to allocation errors
     pub fn try_insert(&mut self, left: T, right: U) -> Result<(), (Option<&U>, Option<&T>)> {
-        // TODO check if the map is near full and resize if necessary
-
         let left_index = self.lookup_index_left(&left);
         let right_index = self.lookup_index_right(&right);
 
         if left_index.is_err() && right_index.is_err() {
+            if !self.can_fit(1) {
+                self.grow();
+            }
+
             self.push_new_bucket(Bucket { left, right }, left_index.unwrap_err(), right_index.unwrap_err());
             Ok(())
         } else {
