@@ -503,6 +503,16 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
+
+    /// Returns a reference to the map’s `BuildHasher` for left values.
+    pub fn hasher_left(&self) -> &H {
+        &self.hasher
+    }
+
+    /// Returns a reference to the map’s `BuildHasher` for right values.
+    pub fn hasher_right(&self) -> &RH {
+        &self.reverse_hasher
+    }
 }
 
 #[cfg(test)]
