@@ -366,17 +366,25 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
                 // the bucket where the right index is currently stored, henceforth "the right bucket".
                 let right_bucket = self.right_index[right_meta_index];
                 if left_bucket != right_bucket {
-                    // delete the right mapping for the left bucket, since we will overwrite its current right value
-                    // with the new right value. Delete it only when left_bucket != right_bucket.
-                    // MUST be deleted BEFORE we call update_mapping_right below, otherwise the searching
-                    // functions will not find the right bucket.
-                    self.delete_mapping_right(self.lookup_index_right(&self.data[left_bucket].right).unwrap());
-
                     // delete the left mapping for this bucket, since we delete it
                     self.delete_mapping_left(self.lookup_index_left(&self.data[right_bucket].left).unwrap());
 
                     // delete the right bucket
                     let bucket = self.delete_bucket(right_bucket);
+
+                    // if the left bucket was moved to the right bucket's position, update the left index
+                    if left_bucket == self.len() {
+                        // the left bucket was moved to the right bucket's position, update the left index
+                        left_bucket = right_bucket;
+                    }
+
+                    // delete the right mapping for the left bucket, since we will overwrite its current right value
+                    // with the new right value. Delete it only when left_bucket != right_bucket.
+                    // MUST be deleted BEFORE we call update_mapping_right below, otherwise the searching
+                    // functions will not find the right bucket.
+                    // but we must call it AFTER deleting the bucket, since the left bucket could
+                    // be moved to the right bucket's position.
+                    self.delete_mapping_right(self.lookup_index_right(&self.data[left_bucket].right).unwrap());
 
                     // update the right mapping from the right bucket to the left bucket
                     // (for which we deleted the previous right mapping)
