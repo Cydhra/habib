@@ -70,22 +70,27 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         }
     }
 
+    /// Convert an element into an index by hashing it and mapping the hash to the given capacity
+    fn hash_to_index<E, G>(hasher: &G, element: &E, capacity: usize) -> usize
+        where E: Hash, G: BuildHasher
+    {
+        let mut hasher = hasher.build_hasher();
+        element.hash(&mut hasher);
+        hasher.finish() as usize % capacity
+    }
+
     /// Get the ideal index (i.e. without collisions) for a left value under the current
     /// container size.
     #[inline(always)]
     fn get_ideal_index_left(&self, left: &T) -> usize {
-        let mut hasher = self.hasher.build_hasher();
-        left.hash(&mut hasher);
-        hasher.finish() as usize % self.current_capacity()
+        Self::hash_to_index(&self.hasher, left, self.current_capacity())
     }
 
     /// Get the ideal index (i.e. without collisions) for a right value under the current
     /// container size.
     #[inline(always)]
     fn get_ideal_index_right(&self, right: &U) -> usize {
-        let mut hasher = self.reverse_hasher.build_hasher();
-        right.hash(&mut hasher);
-        hasher.finish() as usize % self.current_capacity()
+        Self::hash_to_index(&self.reverse_hasher, right, self.current_capacity())
     }
 
     /// Look up the index of an element in the map. This method is used for both left and right
@@ -245,6 +250,13 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     /// Insert metadata into the given index for the given element and bucket index.
     /// The method will move all elements to the right until an empty slot is found.
     /// The method is used for both left and right indices.
+    ///
+    /// # Parameters
+    /// * `meta_index` - The meta index to insert into.
+    /// * `mapping_index` - The index in the meta index to insert at. It must be the index returned
+    /// by the `lookup_index_left` or `lookup_index_right` method. The method will move all elements
+    /// to the right until an empty slot is found, so it should be the index that already exceeds
+    /// the probe distance.
     #[inline(always)]
     fn insert_mapping(meta_index: &mut [usize], mut mapping_index: usize, bucket_index: usize) {
         let mut current_content = bucket_index;
