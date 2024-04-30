@@ -165,9 +165,15 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
 
     /// Push a new bucket to the tail of the data array. This method is used when both left and right
     /// values are new.
-    /// No changes to the indices are made.
-    fn push_new_bucket(&mut self, bucket: Bucket<T, U>) {
+    ///
+    /// # Parameters
+    /// * `bucket` - The bucket to push.
+    /// * `left_index` - The index in the left index where to insert the mapping.
+    /// * `right_index` - The index in the right index where to insert the mapping.
+    fn push_new_bucket(&mut self, bucket: Bucket<T, U>, left_index: usize, right_index: usize) {
         self.data.push(bucket);
+        self.insert_mapping_left(left_index, self.len() - 1);
+        self.insert_mapping_right(right_index, self.len() - 1);
     }
 
     /// Delete a bucket at the given index. It will update one entry in each index, since
@@ -177,8 +183,27 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     /// that the indices of the moved bucket are no longer valid. This method ensures the mappings
     /// are updated correctly, but any temporary variables that hold the indices of the moved bucket
     /// will be invalid.
-    fn delete_bucket(&mut self, bucket_index: usize) -> Bucket<T, U> {
+    ///
+    /// # Parameters
+    /// * `bucket_index` - The index of the bucket to delete.
+    /// * `left_meta_index` - The entry in the left index that points to the bucket to delete.
+    /// If none, this method will search for the index
+    /// * `right_meta_index` - The entry in the right index that points to the bucket to delete.
+    /// If none, this method will search for the index
+    fn delete_bucket(&mut self, bucket_index: usize, left_meta_index: Option<usize>, right_meta_index: Option<usize>) -> Bucket<T, U> {
         assert!(bucket_index < self.len(), "index out of bounds");
+
+        if let Some(left_meta_index) = left_meta_index {
+            self.delete_mapping_left(left_meta_index);
+        } else {
+            self.delete_mapping_left(self.lookup_index_left(&self.data[bucket_index].left).unwrap());
+        }
+
+        if let Some(right_meta_index) = right_meta_index {
+            self.delete_mapping_right(right_meta_index);
+        } else {
+            self.delete_mapping_right(self.lookup_index_right(&self.data[bucket_index].right).unwrap());
+        }
 
         // trivial case: delete and return the last bucket
         if bucket_index == self.len() - 1 {
@@ -360,13 +385,10 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
             if let Ok(right_meta_index) = right_index {
                 // the bucket where the right index is currently stored, henceforth "the right bucket".
                 let right_bucket = self.right_index[right_meta_index];
-                if left_bucket != right_bucket {
-                    // delete the mappings for this bucket, since we delete it
-                    self.delete_mapping_left(self.lookup_index_left(&self.data[right_bucket].left).unwrap());
-                    self.delete_mapping_right(right_meta_index);
 
+                if left_bucket != right_bucket {
                     // delete the right bucket
-                    let bucket = self.delete_bucket(right_bucket);
+                    let bucket = self.delete_bucket(right_bucket, None, right_index.ok());
 
                     // if the left bucket was moved to the right bucket's position, update the left index
                     if left_bucket == self.len() {
@@ -394,19 +416,16 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         } else if let Ok(right_meta_index) = right_index {
             let right_bucket = self.right_index[right_meta_index];
 
-            // insert mapping to the left index, no update to right index necessary.
-            self.insert_mapping_left(left_index.unwrap_err(), right_bucket);
-
             // replace the right bucket with the new bucket, and delete the left mapping to it,
             // since we insert a new left mapping for the new value
             self.delete_mapping_left(self.lookup_index_left(&self.data[right_bucket].left).unwrap());
+
+            // insert mapping to the left index, no update to right index necessary.
+            self.insert_mapping_left(left_index.unwrap_err(), right_bucket);
             let bucket = self.replace_bucket(right_bucket, Bucket { left, right });
             old_left = Some(bucket.left);
         } else {
-            self.push_new_bucket(Bucket { left, right });
-
-            self.insert_mapping_left(left_index.unwrap_err(), self.len() - 1);
-            self.insert_mapping_right(right_index.unwrap_err(), self.len() - 1);
+            self.push_new_bucket(Bucket { left, right }, left_index.unwrap_err(), right_index.unwrap_err());
         }
 
         (old_right, old_left)
@@ -429,10 +448,7 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         let right_index = self.lookup_index_right(&right);
 
         if left_index.is_err() && right_index.is_err() {
-            self.push_new_bucket(Bucket { left, right });
-
-            self.insert_mapping_left(left_index.unwrap_err(), self.len() - 1);
-            self.insert_mapping_right(right_index.unwrap_err(), self.len() - 1);
+            self.push_new_bucket(Bucket { left, right }, left_index.unwrap_err(), right_index.unwrap_err());
             Ok(())
         } else {
             Err((left_index.ok().map(|index| &self.data[self.left_index[index]].right), right_index.ok().map(|index| &self.data[self.right_index[index]].left)))
@@ -445,14 +461,9 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         let left_index = self.lookup_index_left(left);
         if let Ok(left_meta_index) = left_index {
             let bucket = self.left_index[left_meta_index];
-            let right_meta_index = self.lookup_index_right(&self.data[bucket].right).unwrap();
-
-            // delete the right mapping for this bucket
-            self.delete_mapping_left(left_meta_index);
-            self.delete_mapping_right(right_meta_index);
 
             // delete the bucket
-            let bucket = self.delete_bucket(bucket);
+            let bucket = self.delete_bucket(bucket, left_index.ok(), None);
             Some(bucket.right)
         } else {
             None
@@ -465,14 +476,9 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         let right_index = self.lookup_index_right(right);
         if let Ok(right_meta_index) = right_index {
             let bucket = self.right_index[right_meta_index];
-            let left_meta_index = self.lookup_index_left(&self.data[bucket].left).unwrap();
-
-            // delete the left mapping for this bucket
-            self.delete_mapping_left(left_meta_index);
-            self.delete_mapping_right(right_meta_index);
 
             // delete the bucket
-            let bucket = self.delete_bucket(bucket);
+            let bucket = self.delete_bucket(bucket, None, right_index.ok());
             Some(bucket.left)
         } else {
             None
