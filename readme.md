@@ -1,7 +1,7 @@
 # Habib Bidirectional Hashmap
 
 This is a bidirectional hashmap implementation in pure Rust.
-Values are mapped one-to-one, meaning that each key is associated with exactly one value and vice versa.
+Values are mapped one-to-one, that is, each key is associated with exactly one value and vice versa.
 The hashing algorithm is exchangeable, mirroring how the standard library's `HashMap` works.
 The API tries to mirror the standard library's `HashMap` where applicable.
 
