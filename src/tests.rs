@@ -513,3 +513,21 @@ fn test_move_bucket_during_replacement() {
     assert_eq!(map.get_left(&2), Some(&3));
     assert_eq!(map.get_left(&4), None);
 }
+
+#[test]
+fn test_clear() {
+    // test whether the map is cleared correctly
+    let mut map = BiMap::default();
+
+    map.insert(1, 2);
+    map.insert(3, 4);
+
+    map.clear();
+
+    assert!(map.is_empty());
+    assert_eq!(map.len(), 0);
+    assert_eq!(map.get_right(&1), None);
+    assert_eq!(map.get_left(&2), None);
+    assert_eq!(map.get_right(&3), None);
+    assert_eq!(map.get_left(&4), None);
+}

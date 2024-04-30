@@ -484,6 +484,13 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         }
     }
 
+    /// Clears the map, removing all mappings. Keeps the allocated memory for reuse.
+    pub fn clear(&mut self) {
+        self.data.clear();
+        self.left_index.fill(EMPTY_SLOT);
+        self.right_index.fill(EMPTY_SLOT);
+    }
+
     /// Returns the number of bijections stored in the map, meaning it is half the number of values.
     pub fn len(&self) -> usize {
         self.data.len()
