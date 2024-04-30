@@ -11,7 +11,6 @@ const EMPTY_SLOT: usize = usize::MAX;
 pub struct BiMap<T, U, H = RandomState, RH = RandomState>
     where T: Hash + Eq, U: Hash + Eq
 {
-    // TODO can we profit of Result-optimization if the 0th element is a sentinel?
     data: Vec<Bucket<T, U>>,
     left_index: Box<[usize]>,
     right_index: Box<[usize]>,
