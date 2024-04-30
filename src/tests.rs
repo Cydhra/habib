@@ -466,6 +466,28 @@ fn test_multi_collision() {
 }
 
 #[test]
+fn test_right_collision() {
+    // test whether replacing works correctly when the right value has a collision
+    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+
+    map.insert(1, 4);
+    map.insert(2, DEFAULT_CAPACITY + 4);
+    map.insert(1, DEFAULT_CAPACITY + 4);
+
+    assert_eq!(map.get_right(&1), Some(&(DEFAULT_CAPACITY + 4)));
+    assert_eq!(map.get_left(&(DEFAULT_CAPACITY + 4)), Some(&1));
+
+    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+
+    map.insert(1, 4);
+    map.insert(2, DEFAULT_CAPACITY + 4);
+    map.insert(2, 4);
+
+    assert_eq!(map.get_right(&2), Some(&4));
+    assert_eq!(map.get_left(&4), Some(&2));
+}
+
+#[test]
 fn test_move_bucket_during_replacement() {
     // test whether buckets are replaced correctly, if they move during the operation.
     // this can happen if an insert overwrites two mappings, and the right mapping is not the last

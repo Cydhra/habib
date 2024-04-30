@@ -405,9 +405,8 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
 
             // delete the right mapping for the left bucket, since we will insert a new right value,
             // and insert that value
-            let correct_mapping_location_right = right_index.unwrap_or_else(|e| e);
             self.delete_mapping_right(self.lookup_index_right(&self.data[left_bucket].right).unwrap());
-            self.insert_mapping_right(correct_mapping_location_right, left_bucket);
+            self.insert_mapping_right(self.lookup_index_right(&right).unwrap_err(), left_bucket);
 
             // replace left bucket with new bucket, no update to left index necessary, since it
             // already points to this bucket.
