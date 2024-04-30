@@ -250,11 +250,6 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         Self::insert_mapping(&mut self.right_index, mapping_index, bucket_index)
     }
 
-    /// Update the index where the mapping is pointing to in the right index.
-    fn update_mapping_right(&mut self, mapping_index: usize, bucket_index: usize) {
-        self.right_index[mapping_index] = bucket_index;
-    }
-
     /// Delete a mapping in the left index and move following elements to the right if necessary.
     fn delete_mapping_left(&mut self, mapping_index: usize) {
         self.left_index[mapping_index] = EMPTY_SLOT;
@@ -366,8 +361,9 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
                 // the bucket where the right index is currently stored, henceforth "the right bucket".
                 let right_bucket = self.right_index[right_meta_index];
                 if left_bucket != right_bucket {
-                    // delete the left mapping for this bucket, since we delete it
+                    // delete the mappings for this bucket, since we delete it
                     self.delete_mapping_left(self.lookup_index_left(&self.data[right_bucket].left).unwrap());
+                    self.delete_mapping_right(right_meta_index);
 
                     // delete the right bucket
                     let bucket = self.delete_bucket(right_bucket);
@@ -378,31 +374,18 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
                         left_bucket = right_bucket;
                     }
 
-                    // delete the right mapping for the left bucket, since we will overwrite its current right value
-                    // with the new right value. Delete it only when left_bucket != right_bucket.
-                    // MUST be deleted BEFORE we call update_mapping_right below, otherwise the searching
-                    // functions will not find the right bucket.
-                    // but we must call it AFTER deleting the bucket, since the left bucket could
-                    // be moved to the right bucket's position.
-                    self.delete_mapping_right(self.lookup_index_right(&self.data[left_bucket].right).unwrap());
-
-                    // update the right mapping from the right bucket to the left bucket
-                    // (for which we deleted the previous right mapping)
-                    self.update_mapping_right(right_meta_index, left_bucket);
                     old_left = Some(bucket.left);
                 } else {
                     // old mapping is equal to the new mapping, do nothing
                     return (Some(right), Some(left));
                 }
-            } else {
-                // delete the right mapping for the left bucket, since we will overwrite the value
-                // with the new right value. Delete it only when the right bucket doesn't exist,
-                // since no changes are done in case of an insertion that doesn't change the mapping.
-                self.delete_mapping_right(self.lookup_index_right(&self.data[left_bucket].right).unwrap());
-
-                // insert a new mapping for the right value, since it does not exist
-                self.insert_mapping_right(right_index.unwrap_err(), left_bucket);
             }
+
+            // delete the right mapping for the left bucket, since we will insert a new right value,
+            // and insert that value
+            let correct_mapping_location_right = right_index.unwrap_or_else(|e| e);
+            self.delete_mapping_right(self.lookup_index_right(&self.data[left_bucket].right).unwrap());
+            self.insert_mapping_right(correct_mapping_location_right, left_bucket);
 
             // replace left bucket with new bucket, no update to left index necessary, since it
             // already points to this bucket.
