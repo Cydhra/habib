@@ -166,6 +166,8 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     /// Push a new bucket to the tail of the data array. This method is used when both left and right
     /// values are new.
     ///
+    /// The method will insert the mappings into the left and right indices at the given indices.
+    ///
     /// # Parameters
     /// * `bucket` - The bucket to push.
     /// * `left_index` - The index in the left index where to insert the mapping.
@@ -178,6 +180,7 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
 
     /// Delete a bucket at the given index. It will update one entry in each index, since
     /// the last bucket is moved to the deleted bucket's position.
+    /// It will also delete the mappings for the bucket in both left and right indices.
     ///
     /// Note: If the bucket to delete is NOT the last bucket, the last bucket will move, meaning
     /// that the indices of the moved bucket are no longer valid. This method ensures the mappings
