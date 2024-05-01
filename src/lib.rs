@@ -45,9 +45,9 @@ impl<T, U> BiMap<T, U>
 
     /// Create a new empty BiMap with the given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
-        let capacity = (capacity as f64 / MAX_LOAD_FACTOR).ceil() as usize;
-        let left_index = vec![EMPTY_SLOT; capacity].into_boxed_slice();
-        let right_index = vec![EMPTY_SLOT; capacity].into_boxed_slice();
+        let capacity_with_load = (capacity as f64 / MAX_LOAD_FACTOR).ceil() as usize;
+        let left_index = vec![EMPTY_SLOT; capacity_with_load].into_boxed_slice();
+        let right_index = vec![EMPTY_SLOT; capacity_with_load].into_boxed_slice();
         BiMap {
             data: Vec::with_capacity(capacity),
             left_index,
