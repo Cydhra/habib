@@ -551,3 +551,13 @@ fn test_growing() {
 
     assert!(map.current_capacity() > initial_capacity);
 }
+
+#[test]
+fn test_capacity() {
+    // test that the load factor is not exceeded when map is allocated with capacity
+
+    for i in 0..1000 {
+        let mut map = BiMap::<u8, u8>::with_capacity(i);
+        assert!(map.can_fit(i), "Failed for capacity {}", i);
+    }
+}

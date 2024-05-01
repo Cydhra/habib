@@ -45,7 +45,7 @@ impl<T, U> BiMap<T, U>
 
     /// Create a new empty BiMap with the given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
-        let capacity_with_load = (capacity as f64 / MAX_LOAD_FACTOR).ceil() as usize;
+        let capacity_with_load = (capacity as f64 / MAX_LOAD_FACTOR).ceil() as usize + 1;
         let left_index = vec![EMPTY_SLOT; capacity_with_load].into_boxed_slice();
         let right_index = vec![EMPTY_SLOT; capacity_with_load].into_boxed_slice();
         BiMap {
@@ -361,7 +361,7 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
 
     /// Returns whether the map can fit additional `num` elements without exceeding the maximum load.
     fn can_fit(&self, num: usize) -> bool {
-        (self.len() + num) < (self.current_capacity() as f64 * MAX_LOAD_FACTOR).floor() as usize
+        ((self.len() + num) as f64) < (self.current_capacity() as f64 * MAX_LOAD_FACTOR)
     }
 
     /// Grow the map according to the growth factor.
