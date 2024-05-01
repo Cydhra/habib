@@ -638,7 +638,6 @@ fn test_shrink_to() {
     }
 
     assert!(map.current_capacity() < 500);
-
 }
 
 #[test]
@@ -672,4 +671,32 @@ fn test_iter() {
     assert!(from_iter.contains(&&4));
     assert!(from_iter.contains(&&6));
     assert!(from_iter.contains(&&8));
+}
+
+#[test]
+pub fn test_drain() {
+    // test that the drain iterator returns all elements
+    let mut map = BiMap::default();
+
+    map.insert(1, 2);
+    map.insert(3, 4);
+    map.insert(5, 6);
+    map.insert(7, 8);
+    map.insert(1, 8);
+
+    let from_iter = map.drain().collect::<Vec<_>>();
+
+    assert_eq!(from_iter.len(), 3);
+    assert!(from_iter.contains(&(1, 8)));
+    assert!(from_iter.contains(&(3, 4)));
+    assert!(from_iter.contains(&(5, 6)));
+
+    assert!(map.is_empty());
+
+    assert_eq!(map.get_left(&1), None);
+    assert_eq!(map.get_right(&8), None);
+    assert_eq!(map.get_left(&3), None);
+    assert_eq!(map.get_right(&4), None);
+    assert_eq!(map.get_left(&5), None);
+    assert_eq!(map.get_right(&6), None);
 }

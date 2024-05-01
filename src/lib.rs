@@ -626,6 +626,15 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         self.data.iter().map(|bucket| &bucket.right)
     }
 
+    /// Clears the map, returning all value pairs as an iterator in arbitrary order.
+    /// Keeps the allocated memory for reuse.
+    /// The iterator keeps a mutable reference to the map.
+    pub fn drain<'s>(&'s mut self) -> impl Iterator<Item=(T, U)> + 's {
+        self.left_index.fill(EMPTY_SLOT);
+        self.right_index.fill(EMPTY_SLOT);
+        self.data.drain(..).map(|bucket| (bucket.left, bucket.right))
+    }
+
     /// Returns the number of bijections stored in the map, meaning it is half the number of values.
     pub fn len(&self) -> usize {
         self.data.len()
