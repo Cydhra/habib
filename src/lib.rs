@@ -45,7 +45,7 @@ impl<T, U> BiMap<T, U>
 
     /// Create a new empty BiMap with the given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
-        let capacity_with_load = (capacity as f64 / MAX_LOAD_FACTOR).ceil() as usize + 1;
+        let capacity_with_load = Self::apply_load_factor(capacity);
         let left_index = vec![EMPTY_SLOT; capacity_with_load].into_boxed_slice();
         let right_index = vec![EMPTY_SLOT; capacity_with_load].into_boxed_slice();
         BiMap {
@@ -72,6 +72,12 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
             hasher,
             reverse_hasher,
         }
+    }
+
+    /// Increase a capacity to make sure no reallocation is required while filling the capacity even
+    /// when the maximum load factor is reached.
+    fn apply_load_factor(capacity: usize) -> usize {
+        (capacity as f64 / MAX_LOAD_FACTOR) as usize + 1
     }
 
     /// Convert an element into an index by hashing it and mapping the hash to the given capacity
@@ -364,10 +370,10 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         ((self.len() + num) as f64) < (self.current_capacity() as f64 * MAX_LOAD_FACTOR)
     }
 
-    /// Grow the map according to the growth factor.
-    fn grow(&mut self) {
-        let mut new_left_index = vec![EMPTY_SLOT; (self.current_capacity() as f64 * GROWTH_FACTOR).ceil() as usize].into_boxed_slice();
-        let mut new_right_index = vec![EMPTY_SLOT; (self.current_capacity() as f64 * GROWTH_FACTOR).ceil() as usize].into_boxed_slice();
+    /// Grow the map to the given capacity.
+    fn grow_to(&mut self, new_capacity: usize) {
+        let mut new_left_index = vec![EMPTY_SLOT; new_capacity].into_boxed_slice();
+        let mut new_right_index = vec![EMPTY_SLOT; new_capacity].into_boxed_slice();
 
         for (bucket_index, bucket) in self.data.iter().enumerate() {
             let left_element_index = Self::probe_index(&bucket.left, &new_left_index, &self.hasher, |bucket: &Bucket<T, U>| &bucket.left, &self.data[..bucket_index], new_left_index.len()).unwrap_err();
@@ -379,6 +385,11 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
 
         self.left_index = new_left_index;
         self.right_index = new_right_index;
+    }
+
+    /// Grow the map according to the growth factor.
+    fn grow(&mut self) {
+        self.grow_to((self.current_capacity() as f64 * GROWTH_FACTOR).ceil() as usize)
     }
 
     /// Get the right value for the given left value. If the left value is not in the map, None is
@@ -544,6 +555,25 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
             Some(bucket.left)
         } else {
             None
+        }
+    }
+
+    /// Reserves capacity for at least `additional` more elements to be inserted in the map.
+    /// The collection may reserve more space to speculatively avoid frequent reallocations.
+    /// After calling reserve, capacity will be greater than or equal to `self.len() + additional`.
+    /// Does nothing if capacity is already sufficient.
+    ///
+    /// # Panics
+    /// Panics, if the new capacity overflows usize.
+    /// Panics, if the allocation fails.
+    pub fn reserve(&mut self, additional: usize) {
+        if !self.can_fit(additional) {
+            if usize::MAX - self.current_capacity() < additional {
+                panic!("capacity overflow");
+            }
+
+            let new_capacity = Self::apply_load_factor(self.len() + additional);
+            self.grow_to(new_capacity);
         }
     }
 

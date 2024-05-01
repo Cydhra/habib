@@ -563,6 +563,37 @@ fn test_capacity() {
 }
 
 #[test]
+fn test_reserve() {
+    // test that the map grows correctly when reserving space
+    let mut map = BiMap::<u8, u8>::with_capacity(100);
+    map.reserve(1000);
+    assert!(map.can_fit(1000));
+
+    let mut map = BiMap::<u8, u8>::with_capacity(200);
+    map.reserve(5000);
+    assert!(map.can_fit(5000));
+
+    let mut map = BiMap::<u8, u8>::with_capacity(10);
+    map.reserve(11);
+    assert!(map.can_fit(11));
+
+    let mut map = BiMap::<u8, u8>::with_capacity(10);
+    map.reserve(0);
+    assert!(map.can_fit(10));
+
+    let mut map = BiMap::<u8, u8>::with_capacity(1000);
+    for i in 0..200 {
+        map.insert(i, i);
+    }
+    map.reserve(2000);
+    assert!(map.can_fit(2000));
+    for i in 0..200 {
+        assert_eq!(map.get_right(&i), Some(&i));
+        assert_eq!(map.get_left(&i), Some(&i));
+    }
+}
+
+#[test]
 fn test_iter() {
     // test that the iterator returns all elements
     let mut map = BiMap::default();
