@@ -594,6 +594,25 @@ fn test_reserve() {
 }
 
 #[test]
+fn test_shrink_to_fit() {
+    let mut map = BiMap::with_capacity(1000);
+    assert!(map.current_capacity() >= 1000);
+
+    for i in 0..100 {
+        map.insert(i, i);
+    }
+
+    map.shrink_to_fit();
+
+    for i in 0..100 {
+        assert_eq!(map.get_right(&i), Some(&i));
+        assert_eq!(map.get_left(&i), Some(&i));
+    }
+
+    assert!(map.current_capacity() < 1000);
+}
+
+#[test]
 fn test_iter() {
     // test that the iterator returns all elements
     let mut map = BiMap::default();

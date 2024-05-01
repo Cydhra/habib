@@ -371,7 +371,9 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     }
 
     /// Grow the map to the given capacity.
-    fn grow_to(&mut self, new_capacity: usize) {
+    fn resize(&mut self, new_capacity: usize) {
+        assert!(new_capacity >= self.len(), "new capacity must be at least the current length");
+
         let mut new_left_index = vec![EMPTY_SLOT; new_capacity].into_boxed_slice();
         let mut new_right_index = vec![EMPTY_SLOT; new_capacity].into_boxed_slice();
 
@@ -389,7 +391,7 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
 
     /// Grow the map according to the growth factor.
     fn grow(&mut self) {
-        self.grow_to((self.current_capacity() as f64 * GROWTH_FACTOR).ceil() as usize)
+        self.resize((self.current_capacity() as f64 * GROWTH_FACTOR).ceil() as usize)
     }
 
     /// Get the right value for the given left value. If the left value is not in the map, None is
@@ -573,8 +575,18 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
             }
 
             let new_capacity = Self::apply_load_factor(self.len() + additional);
-            self.grow_to(new_capacity);
+            self.resize(new_capacity);
         }
+    }
+
+    /// Shrinks the capacity of the map as much as possible.
+    /// It will drop down as much as possible while maintaining the internal rules and possibly
+    /// leaving some space in accordance with the resize policy.
+    pub fn shrink_to_fit(&mut self) {
+        // we want to leave some space to avoid too many collisions
+        let new_capacity = Self::apply_load_factor(self.len());
+        self.resize(new_capacity);
+        self.data.shrink_to_fit();
     }
 
     /// Clears the map, removing all mappings. Keeps the allocated memory for reuse.
