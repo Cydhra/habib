@@ -557,7 +557,40 @@ fn test_capacity() {
     // test that the load factor is not exceeded when map is allocated with capacity
 
     for i in 0..1000 {
-        let mut map = BiMap::<u8, u8>::with_capacity(i);
+        let map = BiMap::<u8, u8>::with_capacity(i);
         assert!(map.can_fit(i), "Failed for capacity {}", i);
     }
+}
+
+#[test]
+fn test_iter() {
+    // test that the iterator returns all elements
+    let mut map = BiMap::default();
+
+    map.insert(1, 2);
+    map.insert(3, 4);
+    map.insert(5, 6);
+    map.insert(7, 8);
+    map.insert(1, 8);
+
+    let from_iter = map.iter().collect::<Vec<_>>();
+
+    assert_eq!(from_iter.len(), 3);
+    assert!(from_iter.contains(&(&1, &8)));
+    assert!(from_iter.contains(&(&3, &4)));
+    assert!(from_iter.contains(&(&5, &6)));
+
+    let from_iter = map.left_values().collect::<Vec<_>>();
+
+    assert_eq!(from_iter.len(), 3);
+    assert!(from_iter.contains(&&1));
+    assert!(from_iter.contains(&&3));
+    assert!(from_iter.contains(&&5));
+
+    let from_iter = map.right_values().collect::<Vec<_>>();
+
+    assert_eq!(from_iter.len(), 3);
+    assert!(from_iter.contains(&&4));
+    assert!(from_iter.contains(&&6));
+    assert!(from_iter.contains(&&8));
 }

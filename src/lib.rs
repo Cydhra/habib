@@ -554,6 +554,21 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         self.right_index.fill(EMPTY_SLOT);
     }
 
+    /// Returns an iterator over the mappings in the map in arbitrary order.
+    pub fn iter(&self) -> impl Iterator<Item=(&T, &U)> {
+        self.data.iter().map(|bucket| (&bucket.left, &bucket.right))
+    }
+
+    /// Returns an iterator over the left values in the map in arbitrary order.
+    pub fn left_values(&self) -> impl Iterator<Item=&T> {
+        self.data.iter().map(|bucket| &bucket.left)
+    }
+
+    /// Returns an iterator over the right values in the map in arbitrary order.
+    pub fn right_values(&self) -> impl Iterator<Item=&U> {
+        self.data.iter().map(|bucket| &bucket.right)
+    }
+
     /// Returns the number of bijections stored in the map, meaning it is half the number of values.
     pub fn len(&self) -> usize {
         self.data.len()
