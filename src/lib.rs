@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::hash::{BuildHasher, Hash, Hasher, RandomState};
 use std::mem;
 
@@ -587,6 +588,20 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         let new_capacity = Self::apply_load_factor(self.len());
         self.resize(new_capacity);
         self.data.shrink_to_fit();
+    }
+
+    /// Shrinks the capacity of the map with a lower limit.
+    /// It will drop down no lower than the supplied limit
+    /// while maintaining the internal rules
+    /// and possibly leaving some space in accordance with the resize policy.
+    ///
+    /// If the current capacity is less than the lower limit, this is a no-op.
+    pub fn shrink_to(&mut self, min_capacity: usize) {
+        if min_capacity < self.current_capacity() {
+            let new_capacity = Self::apply_load_factor(max(self.len(), min_capacity));
+            self.resize(new_capacity);
+            self.data.shrink_to(min_capacity);
+        }
     }
 
     /// Clears the map, removing all mappings. Keeps the allocated memory for reuse.
