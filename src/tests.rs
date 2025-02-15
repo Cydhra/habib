@@ -12,13 +12,21 @@ impl Hasher for IdentityHasher {
     }
 
     fn write(&mut self, bytes: &[u8]) {
-        self.state = bytes.iter().find(|&&b| b != 0).or(Some(&0)).map(|&b| b % self.modulus).unwrap();
+        self.state = bytes
+            .iter()
+            .find(|&&b| b != 0)
+            .or(Some(&0))
+            .map(|&b| b % self.modulus)
+            .unwrap();
     }
 }
 
 impl Default for IdentityHasher {
     fn default() -> Self {
-        IdentityHasher { modulus: DEFAULT_CAPACITY as u8, state: 0 }
+        IdentityHasher {
+            modulus: DEFAULT_CAPACITY as u8,
+            state: 0,
+        }
     }
 }
 
@@ -252,10 +260,17 @@ fn test_insert_after_delete() {
 fn test_collisions() {
     // Test that the map works correctly when two values are inserted with the same hash
 
-    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+    let mut map = BiMap::with_hashers(
+        DEFAULT_CAPACITY,
+        IdentityHasher::default(),
+        IdentityHasher::default(),
+    );
 
     // verify the test is working as expected
-    assert_eq!(map.get_ideal_index_left(&1), map.get_ideal_index_left(&(DEFAULT_CAPACITY + 1)));
+    assert_eq!(
+        map.get_ideal_index_left(&1),
+        map.get_ideal_index_left(&(DEFAULT_CAPACITY + 1))
+    );
 
     // insert colliding values
     map.insert(1, 2);
@@ -304,7 +319,11 @@ fn test_collisions_wrapping() {
     // test that the map works correctly when two values are inserted with the same hash,
     // and the index for linear probing wraps around the end of the array
 
-    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+    let mut map = BiMap::with_hashers(
+        DEFAULT_CAPACITY,
+        IdentityHasher::default(),
+        IdentityHasher::default(),
+    );
 
     // verify the test is working as expected
     assert_eq!(map.get_ideal_index_left(&31), 31);
@@ -373,7 +392,11 @@ fn test_collisions_wrapping() {
 fn test_collisions_replacement() {
     // test that the map works correctly when two values are inserted with the same hash,
     // and then some of them are replaced by a new insertion
-    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+    let mut map = BiMap::with_hashers(
+        DEFAULT_CAPACITY,
+        IdentityHasher::default(),
+        IdentityHasher::default(),
+    );
 
     map.insert(1, 2);
     map.insert(DEFAULT_CAPACITY + 1, 3);
@@ -384,7 +407,11 @@ fn test_collisions_replacement() {
     assert_eq!(map.get_right(&31), None);
     assert_eq!(map.get_left(&2), None);
 
-    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+    let mut map = BiMap::with_hashers(
+        DEFAULT_CAPACITY,
+        IdentityHasher::default(),
+        IdentityHasher::default(),
+    );
 
     map.insert(1, 2);
     map.insert(DEFAULT_CAPACITY + 1, 3);
@@ -407,7 +434,11 @@ fn test_collisions_replacement() {
 #[test]
 fn test_multi_collision() {
     // test whether a lot of collisions are resolved correctly
-    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+    let mut map = BiMap::with_hashers(
+        DEFAULT_CAPACITY,
+        IdentityHasher::default(),
+        IdentityHasher::default(),
+    );
 
     for i in 0..10 {
         map.insert(i * DEFAULT_CAPACITY + 1, i + 1);
@@ -428,14 +459,24 @@ fn test_multi_collision() {
 
     // test whether a lot of collisions are resolved correctly,
     // some of which wrap around the end of the array
-    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+    let mut map = BiMap::with_hashers(
+        DEFAULT_CAPACITY,
+        IdentityHasher::default(),
+        IdentityHasher::default(),
+    );
 
     for i in 0..10 {
         map.insert(i * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2), i + 1);
 
         for j in 0..=i {
-            assert_eq!(map.get_right(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2))), Some(&(j + 1)));
-            assert_eq!(map.get_left(&(j + 1)), Some(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2))));
+            assert_eq!(
+                map.get_right(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2))),
+                Some(&(j + 1))
+            );
+            assert_eq!(
+                map.get_left(&(j + 1)),
+                Some(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2)))
+            );
         }
     }
 
@@ -448,18 +489,33 @@ fn test_multi_collision() {
     assert_eq!(map.get_left(&1), None);
 
     for j in 1..10 {
-        assert_eq!(map.get_right(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2))), Some(&(j + 1)));
-        assert_eq!(map.get_left(&(j + 1)), Some(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2))));
+        assert_eq!(
+            map.get_right(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2))),
+            Some(&(j + 1))
+        );
+        assert_eq!(
+            map.get_left(&(j + 1)),
+            Some(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2)))
+        );
     }
 
     map.remove_right(&4);
 
     for j in 1..10 {
         if j != 3 {
-            assert_eq!(map.get_right(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2))), Some(&(j + 1)));
-            assert_eq!(map.get_left(&(j + 1)), Some(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2))));
+            assert_eq!(
+                map.get_right(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2))),
+                Some(&(j + 1))
+            );
+            assert_eq!(
+                map.get_left(&(j + 1)),
+                Some(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2)))
+            );
         } else {
-            assert_eq!(map.get_right(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2))), None);
+            assert_eq!(
+                map.get_right(&(j * DEFAULT_CAPACITY + (DEFAULT_CAPACITY - 2))),
+                None
+            );
             assert_eq!(map.get_left(&(j + 1)), None);
         }
     }
@@ -468,7 +524,11 @@ fn test_multi_collision() {
 #[test]
 fn test_right_collision() {
     // test whether replacing works correctly when the right value has a collision
-    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+    let mut map = BiMap::with_hashers(
+        DEFAULT_CAPACITY,
+        IdentityHasher::default(),
+        IdentityHasher::default(),
+    );
 
     map.insert(1, 4);
     map.insert(2, DEFAULT_CAPACITY + 4);
@@ -477,7 +537,11 @@ fn test_right_collision() {
     assert_eq!(map.get_right(&1), Some(&(DEFAULT_CAPACITY + 4)));
     assert_eq!(map.get_left(&(DEFAULT_CAPACITY + 4)), Some(&1));
 
-    let mut map = BiMap::with_hashers(DEFAULT_CAPACITY, IdentityHasher::default(), IdentityHasher::default());
+    let mut map = BiMap::with_hashers(
+        DEFAULT_CAPACITY,
+        IdentityHasher::default(),
+        IdentityHasher::default(),
+    );
 
     map.insert(1, 4);
     map.insert(2, DEFAULT_CAPACITY + 4);
@@ -699,4 +763,20 @@ pub fn test_drain() {
     assert_eq!(map.get_right(&4), None);
     assert_eq!(map.get_left(&5), None);
     assert_eq!(map.get_right(&6), None);
+}
+
+#[test]
+pub fn test_decayed() {
+    // this test tests only whether the crate compiles with specific instantiations,
+    // because it requires that a String map can be queried using &str instead of &String
+    let mut map = BiMap::<String, String>::default();
+    map.insert(String::from("a"), String::from("b"));
+
+    let key: &str = "a";
+    assert_eq!(map.get_right(key), Some(&String::from("b")));
+    assert_eq!(map.get_by_left(key), Some(&String::from("b")));
+
+    let other_key: &str = "b";
+    assert_eq!(map.get_left(other_key), Some(&String::from("a")));
+    assert_eq!(map.get_by_right(other_key), Some(&String::from("a")));
 }

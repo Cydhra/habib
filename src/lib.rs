@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::cmp::max;
 use std::hash::{BuildHasher, Hash, Hasher, RandomState};
 use std::mem;
@@ -14,7 +15,9 @@ const EMPTY_SLOT: usize = usize::MAX;
 /// A bi-directional map.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BiMap<T, U, H = RandomState, RH = RandomState>
-    where T: Hash + Eq, U: Hash + Eq
+where
+    T: Hash + Eq,
+    U: Hash + Eq,
 {
     data: Vec<Bucket<T, U>>,
     left_index: Box<[usize]>,
@@ -30,7 +33,9 @@ struct Bucket<T, U> {
 }
 
 impl<T, U> Default for BiMap<T, U>
-    where T: Hash + Eq, U: Hash + Eq
+where
+    T: Hash + Eq,
+    U: Hash + Eq,
 {
     fn default() -> Self {
         Self::new()
@@ -38,7 +43,10 @@ impl<T, U> Default for BiMap<T, U>
 }
 
 impl<T, U> BiMap<T, U>
-    where T: Hash + Eq, U: Hash + Eq {
+where
+    T: Hash + Eq,
+    U: Hash + Eq,
+{
     /// Create a new empty BiMap with the default capacity.
     pub fn new() -> Self {
         Self::with_capacity(DEFAULT_CAPACITY)
@@ -60,7 +68,11 @@ impl<T, U> BiMap<T, U>
 }
 
 impl<T, U, H, RH> BiMap<T, U, H, RH>
-    where T: Hash + Eq, U: Hash + Eq, H: BuildHasher, RH: BuildHasher
+where
+    T: Hash + Eq,
+    U: Hash + Eq,
+    H: BuildHasher,
+    RH: BuildHasher,
 {
     /// Create a new empty BiMap with the given capacity and hashers.
     pub fn with_hashers(capacity: usize, hasher: H, reverse_hasher: RH) -> Self {
@@ -83,7 +95,9 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
 
     /// Convert an element into an index by hashing it and mapping the hash to the given capacity
     fn hash_to_index<E, G>(hasher: &G, element: &E, capacity: usize) -> usize
-        where E: Hash, G: BuildHasher
+    where
+        E: Hash + ?Sized,
+        G: BuildHasher,
     {
         let mut hasher = hasher.build_hasher();
         element.hash(&mut hasher);
@@ -117,18 +131,30 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     /// * `buckets` - The buckets that contain the elements.
     /// * `capacity` - The capacity of the hash index.
     #[inline(always)]
-    fn probe_index<E, G>(element: &E, hash_index: &[usize], hasher: &G, lookup: fn(&Bucket<T, U>) -> &E, buckets: &[Bucket<T, U>], capacity: usize) -> Result<usize, usize>
-        where E: Hash + Eq, G: BuildHasher
+    fn probe_index<R, E, G>(
+        element: &R,
+        hash_index: &[usize],
+        hasher: &G,
+        lookup: fn(&Bucket<T, U>) -> &E,
+        buckets: &[Bucket<T, U>],
+        capacity: usize,
+    ) -> Result<usize, usize>
+    where
+        E: Borrow<R> + Hash + Eq,
+        R: Hash + Eq + ?Sized,
+        G: BuildHasher,
     {
         let ideal_index = Self::hash_to_index(hasher, element, capacity);
         let mut index = ideal_index;
         let mut dist = 0;
         while hash_index[index] < EMPTY_SLOT {
             let bucket = &buckets[hash_index[index]];
-            if lookup(bucket) == element {
+            if lookup(bucket).borrow() == element {
                 return Ok(index);
             } else {
-                let target_probe_dist = index.wrapping_sub(Self::hash_to_index(hasher, lookup(bucket), capacity)).rem_euclid(capacity);
+                let target_probe_dist = index
+                    .wrapping_sub(Self::hash_to_index(hasher, lookup(bucket), capacity))
+                    .rem_euclid(capacity);
                 if dist > target_probe_dist {
                     return Err(index);
                 }
@@ -157,10 +183,26 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     /// # Panics
     /// This method panics if the map is full.
     #[inline(always)]
-    fn lookup_index<E, G>(&self, element: &E, hash_index: &[usize], hasher: &G, lookup: fn(&Bucket<T, U>) -> &E) -> Result<usize, usize>
-        where E: Hash + Eq, G: BuildHasher
+    fn lookup_index<R, E, G>(
+        &self,
+        element: &R,
+        hash_index: &[usize],
+        hasher: &G,
+        lookup: fn(&Bucket<T, U>) -> &E,
+    ) -> Result<usize, usize>
+    where
+        E: Borrow<R> + Hash + Eq,
+        R: Hash + Eq + ?Sized,
+        G: BuildHasher,
     {
-        Self::probe_index(element, hash_index, hasher, lookup, &self.data, self.current_capacity())
+        Self::probe_index(
+            element,
+            hash_index,
+            hasher,
+            lookup,
+            &self.data,
+            self.current_capacity(),
+        )
     }
 
     /// Find the index that the left value is stored at or would be stored at. If the left value
@@ -176,8 +218,17 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     ///
     /// # Panics
     /// This method panics if the map is full.
-    fn lookup_index_left(&self, left: &T) -> Result<usize, usize> {
-        self.lookup_index(left, &self.left_index, &self.hasher, |bucket: &Bucket<T, U>| &bucket.left)
+    fn lookup_index_left<R>(&self, left: &R) -> Result<usize, usize>
+    where
+        T: Borrow<R>,
+        R: Hash + Eq + ?Sized,
+    {
+        self.lookup_index(
+            left,
+            &self.left_index,
+            &self.hasher,
+            |bucket: &Bucket<T, U>| &bucket.left,
+        )
     }
 
     /// Find the index that the right value is stored at or would be stored at. If the right value
@@ -193,8 +244,17 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     ///
     /// # Panics
     /// This method panics if the map is full.
-    fn lookup_index_right(&self, right: &U) -> Result<usize, usize> {
-        self.lookup_index(right, &self.right_index, &self.reverse_hasher, |bucket: &Bucket<T, U>| &bucket.right)
+    fn lookup_index_right<R>(&self, right: &R) -> Result<usize, usize>
+    where
+        U: Borrow<R>,
+        R: Hash + Eq + ?Sized,
+    {
+        self.lookup_index(
+            right,
+            &self.right_index,
+            &self.reverse_hasher,
+            |bucket: &Bucket<T, U>| &bucket.right,
+        )
     }
 
     /// Push a new bucket to the tail of the data array. This method is used when both left and right
@@ -227,19 +287,30 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     /// If none, this method will search for the index
     /// * `right_meta_index` - The entry in the right index that points to the bucket to delete.
     /// If none, this method will search for the index
-    fn delete_bucket(&mut self, bucket_index: usize, left_meta_index: Option<usize>, right_meta_index: Option<usize>) -> Bucket<T, U> {
+    fn delete_bucket(
+        &mut self,
+        bucket_index: usize,
+        left_meta_index: Option<usize>,
+        right_meta_index: Option<usize>,
+    ) -> Bucket<T, U> {
         assert!(bucket_index < self.len(), "index out of bounds");
 
         if let Some(left_meta_index) = left_meta_index {
             self.delete_mapping_left(left_meta_index);
         } else {
-            self.delete_mapping_left(self.lookup_index_left(&self.data[bucket_index].left).unwrap());
+            self.delete_mapping_left(
+                self.lookup_index_left(&self.data[bucket_index].left)
+                    .unwrap(),
+            );
         }
 
         if let Some(right_meta_index) = right_meta_index {
             self.delete_mapping_right(right_meta_index);
         } else {
-            self.delete_mapping_right(self.lookup_index_right(&self.data[bucket_index].right).unwrap());
+            self.delete_mapping_right(
+                self.lookup_index_right(&self.data[bucket_index].right)
+                    .unwrap(),
+            );
         }
 
         // trivial case: delete and return the last bucket
@@ -327,7 +398,12 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         // move elements over until we find a free spot or an element that is already in the right spot
         let mut current_neighbor = self.left_index[current_mapping_index];
 
-        while current_neighbor != EMPTY_SLOT && self.get_ideal_index_left(&self.data[current_neighbor].left).wrapping_sub(current_mapping_index) != 0 {
+        while current_neighbor != EMPTY_SLOT
+            && self
+                .get_ideal_index_left(&self.data[current_neighbor].left)
+                .wrapping_sub(current_mapping_index)
+                != 0
+        {
             if current_mapping_index == 0 {
                 let (lower, upper) = self.left_index.split_at_mut(self.current_capacity() - 1);
                 mem::swap(&mut lower[0], &mut upper[0]);
@@ -348,7 +424,12 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         // move elements over until we find a free spot or an element that is already in the right spot
         let mut current_neighbor = self.right_index[current_mapping_index];
 
-        while current_neighbor != EMPTY_SLOT && self.get_ideal_index_right(&self.data[current_neighbor].right).wrapping_sub(current_mapping_index) != 0 {
+        while current_neighbor != EMPTY_SLOT
+            && self
+                .get_ideal_index_right(&self.data[current_neighbor].right)
+                .wrapping_sub(current_mapping_index)
+                != 0
+        {
             if current_mapping_index == 0 {
                 let (lower, upper) = self.right_index.split_at_mut(self.current_capacity() - 1);
                 mem::swap(&mut lower[0], &mut upper[0]);
@@ -373,14 +454,33 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
 
     /// Grow the map to the given capacity.
     fn resize(&mut self, new_capacity: usize) {
-        assert!(new_capacity >= self.len(), "new capacity must be at least the current length");
+        assert!(
+            new_capacity >= self.len(),
+            "new capacity must be at least the current length"
+        );
 
         let mut new_left_index = vec![EMPTY_SLOT; new_capacity].into_boxed_slice();
         let mut new_right_index = vec![EMPTY_SLOT; new_capacity].into_boxed_slice();
 
         for (bucket_index, bucket) in self.data.iter().enumerate() {
-            let left_element_index = Self::probe_index(&bucket.left, &new_left_index, &self.hasher, |bucket: &Bucket<T, U>| &bucket.left, &self.data[..bucket_index], new_left_index.len()).unwrap_err();
-            let right_element_index = Self::probe_index(&bucket.right, &new_right_index, &self.reverse_hasher, |bucket: &Bucket<T, U>| &bucket.right, &self.data[..bucket_index], new_right_index.len()).unwrap_err();
+            let left_element_index = Self::probe_index(
+                &bucket.left,
+                &new_left_index,
+                &self.hasher,
+                |bucket: &Bucket<T, U>| &bucket.left,
+                &self.data[..bucket_index],
+                new_left_index.len(),
+            )
+            .unwrap_err();
+            let right_element_index = Self::probe_index(
+                &bucket.right,
+                &new_right_index,
+                &self.reverse_hasher,
+                |bucket: &Bucket<T, U>| &bucket.right,
+                &self.data[..bucket_index],
+                new_right_index.len(),
+            )
+            .unwrap_err();
 
             Self::insert_mapping(&mut new_left_index, left_element_index, bucket_index);
             Self::insert_mapping(&mut new_right_index, right_element_index, bucket_index);
@@ -398,7 +498,11 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     /// Get the right value for the given left value. If the left value is not in the map, None is
     /// returned.
     #[must_use]
-    pub fn get_right(&self, left: &T) -> Option<&U> {
+    pub fn get_right<R>(&self, left: &R) -> Option<&U>
+    where
+        T: Borrow<R>,
+        R: Hash + Eq + ?Sized,
+    {
         self.lookup_index_left(left)
             .ok()
             .map(|index| &self.data[self.left_index[index]].right)
@@ -408,14 +512,22 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     /// returned.
     /// This method is an alias for [`get_right`](#method.get_right).
     #[must_use]
-    pub fn get_by_left(&self, left: &T) -> Option<&U> {
+    pub fn get_by_left<R>(&self, left: &R) -> Option<&U>
+    where
+        T: Borrow<R>,
+        R: Hash + Eq + ?Sized,
+    {
         self.get_right(left)
     }
 
     /// Get the left value for the given right value. If the right value is not in the map, None is
     /// returned.
     #[must_use]
-    pub fn get_left(&self, right: &U) -> Option<&T> {
+    pub fn get_left<R>(&self, right: &R) -> Option<&T>
+    where
+        U: Borrow<R>,
+        R: Hash + Eq + ?Sized,
+    {
         self.lookup_index_right(right)
             .ok()
             .map(|index| &self.data[self.right_index[index]].left)
@@ -425,7 +537,11 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     /// returned.
     /// This method is an alias for [`get_left`](#method.get_left).
     #[must_use]
-    pub fn get_by_right(&self, right: &U) -> Option<&T> {
+    pub fn get_by_right<R>(&self, right: &R) -> Option<&T>
+    where
+        U: Borrow<R>,
+        R: Hash + Eq + ?Sized,
+    {
         self.get_left(right)
     }
 
@@ -496,7 +612,10 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
 
             // delete the right mapping for the left bucket, since we will insert a new right value,
             // and insert that value
-            self.delete_mapping_right(self.lookup_index_right(&self.data[left_bucket].right).unwrap());
+            self.delete_mapping_right(
+                self.lookup_index_right(&self.data[left_bucket].right)
+                    .unwrap(),
+            );
             self.insert_mapping_right(self.lookup_index_right(&right).unwrap_err(), left_bucket);
 
             // replace left bucket with new bucket, no update to left index necessary, since it
@@ -508,14 +627,21 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
 
             // replace the right bucket with the new bucket, and delete the left mapping to it,
             // since we insert a new left mapping for the new value
-            self.delete_mapping_left(self.lookup_index_left(&self.data[right_bucket].left).unwrap());
+            self.delete_mapping_left(
+                self.lookup_index_left(&self.data[right_bucket].left)
+                    .unwrap(),
+            );
 
             // insert mapping to the left index, no update to right index necessary.
             self.insert_mapping_left(left_index.unwrap_err(), right_bucket);
             let bucket = self.replace_bucket(right_bucket, Bucket { left, right });
             old_left = Some(bucket.left);
         } else {
-            self.push_new_bucket(Bucket { left, right }, left_index.unwrap_err(), right_index.unwrap_err());
+            self.push_new_bucket(
+                Bucket { left, right },
+                left_index.unwrap_err(),
+                right_index.unwrap_err(),
+            );
         }
 
         (old_right, old_left)
@@ -540,10 +666,21 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
                 self.grow();
             }
 
-            self.push_new_bucket(Bucket { left, right }, left_index.unwrap_err(), right_index.unwrap_err());
+            self.push_new_bucket(
+                Bucket { left, right },
+                left_index.unwrap_err(),
+                right_index.unwrap_err(),
+            );
             Ok(())
         } else {
-            Err((left_index.ok().map(|index| &self.data[self.left_index[index]].right), right_index.ok().map(|index| &self.data[self.right_index[index]].left)))
+            Err((
+                left_index
+                    .ok()
+                    .map(|index| &self.data[self.left_index[index]].right),
+                right_index
+                    .ok()
+                    .map(|index| &self.data[self.right_index[index]].left),
+            ))
         }
     }
 
@@ -628,27 +765,29 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
     }
 
     /// Returns an iterator over the mappings in the map in arbitrary order.
-    pub fn iter(&self) -> impl Iterator<Item=(&T, &U)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&T, &U)> {
         self.data.iter().map(|bucket| (&bucket.left, &bucket.right))
     }
 
     /// Returns an iterator over the left values in the map in arbitrary order.
-    pub fn left_values(&self) -> impl Iterator<Item=&T> {
+    pub fn left_values(&self) -> impl Iterator<Item = &T> {
         self.data.iter().map(|bucket| &bucket.left)
     }
 
     /// Returns an iterator over the right values in the map in arbitrary order.
-    pub fn right_values(&self) -> impl Iterator<Item=&U> {
+    pub fn right_values(&self) -> impl Iterator<Item = &U> {
         self.data.iter().map(|bucket| &bucket.right)
     }
 
     /// Clears the map, returning all value pairs as an iterator in arbitrary order.
     /// Keeps the allocated memory for reuse.
     /// The iterator keeps a mutable reference to the map.
-    pub fn drain<'s>(&'s mut self) -> impl Iterator<Item=(T, U)> + 's {
+    pub fn drain<'s>(&'s mut self) -> impl Iterator<Item = (T, U)> + 's {
         self.left_index.fill(EMPTY_SLOT);
         self.right_index.fill(EMPTY_SLOT);
-        self.data.drain(..).map(|bucket| (bucket.left, bucket.right))
+        self.data
+            .drain(..)
+            .map(|bucket| (bucket.left, bucket.right))
     }
 
     /// Returns the number of bijections stored in the map, meaning it is half the number of values.
