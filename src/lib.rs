@@ -67,10 +67,10 @@ where
     }
 }
 
-impl<T, U, H, RH> BiMap<T, U, H, RH>
+impl<Left, Right, H, RH> BiMap<Left, Right, H, RH>
 where
-    T: Hash + Eq,
-    U: Hash + Eq,
+    Left: Hash + Eq,
+    Right: Hash + Eq,
     H: BuildHasher,
     RH: BuildHasher,
 {
@@ -107,14 +107,14 @@ where
     /// Get the ideal index (i.e. without collisions) for a left value under the current
     /// container size.
     #[inline(always)]
-    fn get_ideal_index_left(&self, left: &T) -> usize {
+    fn get_ideal_index_left(&self, left: &Left) -> usize {
         Self::hash_to_index(&self.hasher, left, self.current_capacity())
     }
 
     /// Get the ideal index (i.e. without collisions) for a right value under the current
     /// container size.
     #[inline(always)]
-    fn get_ideal_index_right(&self, right: &U) -> usize {
+    fn get_ideal_index_right(&self, right: &Right) -> usize {
         Self::hash_to_index(&self.reverse_hasher, right, self.current_capacity())
     }
 
@@ -138,8 +138,8 @@ where
         element: &R,
         hash_index: &[usize],
         hasher: &G,
-        lookup: fn(&Bucket<T, U>) -> &E,
-        buckets: &[Bucket<T, U>],
+        lookup: fn(&Bucket<Left, Right>) -> &E,
+        buckets: &[Bucket<Left, Right>],
         capacity: usize,
     ) -> Result<usize, usize>
     where
@@ -174,7 +174,7 @@ where
     /// It is not intended to be called directly, but rather through the lookup_index_left and
     /// lookup_index_right methods.
     ///
-    /// The key may be any borrowed form of the map’s key type,
+    /// The key may be any borrowed form of the map’s opposite key type,
     /// but Hash and Eq on the borrowed form must match those for the key type.
     ///
     /// # Arguments
@@ -189,16 +189,16 @@ where
     /// # Panics
     /// This method panics if the map is full.
     #[inline(always)]
-    fn lookup_index<R, E, G>(
+    fn lookup_index<Ref, E, G>(
         &self,
-        element: &R,
+        element: &Ref,
         hash_index: &[usize],
         hasher: &G,
-        lookup: fn(&Bucket<T, U>) -> &E,
+        lookup: fn(&Bucket<Left, Right>) -> &E,
     ) -> Result<usize, usize>
     where
-        E: Borrow<R> + Hash + Eq,
-        R: Hash + Eq + ?Sized,
+        E: Borrow<Ref> + Hash + Eq,
+        Ref: Hash + Eq + ?Sized,
         G: BuildHasher,
     {
         Self::probe_index(
@@ -215,8 +215,8 @@ where
     /// is not in the map, the returned index is either empty or contains a bucket with a lower
     /// probe distance.
     ///
-    /// The key may be any borrowed form of the map’s key type,
-    /// but Hash and Eq on the borrowed form must match those for the key type.
+    /// The key may be any borrowed form of the map’s left type,
+    /// but Hash and Eq on the borrowed form must match those for the left type.
     ///
     /// # Arguments
     /// * `left` - The left value to look up.
@@ -227,16 +227,16 @@ where
     ///
     /// # Panics
     /// This method panics if the map is full.
-    fn lookup_index_left<R>(&self, left: &R) -> Result<usize, usize>
+    fn lookup_index_left<Ref>(&self, left: &Ref) -> Result<usize, usize>
     where
-        T: Borrow<R>,
-        R: Hash + Eq + ?Sized,
+        Left: Borrow<Ref>,
+        Ref: Hash + Eq + ?Sized,
     {
         self.lookup_index(
             left,
             &self.left_index,
             &self.hasher,
-            |bucket: &Bucket<T, U>| &bucket.left,
+            |bucket: &Bucket<Left, Right>| &bucket.left,
         )
     }
 
@@ -244,8 +244,8 @@ where
     /// is not in the map, the returned index is either empty or contains a bucket with a lower
     /// probe distance.
     ///
-    /// The key may be any borrowed form of the map’s key type,
-    /// but Hash and Eq on the borrowed form must match those for the key type.
+    /// The query value may be any borrowed form of the map’s right type,
+    /// but Hash and Eq on the borrowed form must match those for the right type.
     ///
     /// # Arguments
     /// * `right` - The right value to look up.
@@ -256,16 +256,16 @@ where
     ///
     /// # Panics
     /// This method panics if the map is full.
-    fn lookup_index_right<R>(&self, right: &R) -> Result<usize, usize>
+    fn lookup_index_right<Ref>(&self, right: &Ref) -> Result<usize, usize>
     where
-        U: Borrow<R>,
-        R: Hash + Eq + ?Sized,
+        Right: Borrow<Ref>,
+        Ref: Hash + Eq + ?Sized,
     {
         self.lookup_index(
             right,
             &self.right_index,
             &self.reverse_hasher,
-            |bucket: &Bucket<T, U>| &bucket.right,
+            |bucket: &Bucket<Left, Right>| &bucket.right,
         )
     }
 
@@ -278,7 +278,12 @@ where
     /// * `bucket` - The bucket to push.
     /// * `left_index` - The index in the left index where to insert the mapping.
     /// * `right_index` - The index in the right index where to insert the mapping.
-    fn push_new_bucket(&mut self, bucket: Bucket<T, U>, left_index: usize, right_index: usize) {
+    fn push_new_bucket(
+        &mut self,
+        bucket: Bucket<Left, Right>,
+        left_index: usize,
+        right_index: usize,
+    ) {
         self.data.push(bucket);
         self.insert_mapping_left(left_index, self.len() - 1);
         self.insert_mapping_right(right_index, self.len() - 1);
@@ -304,7 +309,7 @@ where
         bucket_index: usize,
         left_meta_index: Option<usize>,
         right_meta_index: Option<usize>,
-    ) -> Bucket<T, U> {
+    ) -> Bucket<Left, Right> {
         assert!(bucket_index < self.len(), "index out of bounds");
 
         if let Some(left_meta_index) = left_meta_index {
@@ -353,7 +358,11 @@ where
 
     /// Replace a bucket at the given index with a new bucket. The old bucket is returned.
     /// No changes to the indices are made.
-    fn replace_bucket(&mut self, bucket_index: usize, bucket: Bucket<T, U>) -> Bucket<T, U> {
+    fn replace_bucket(
+        &mut self,
+        bucket_index: usize,
+        bucket: Bucket<Left, Right>,
+    ) -> Bucket<Left, Right> {
         assert!(bucket_index < self.len(), "index out of bounds");
         let mut old_bucket = bucket;
         mem::swap(&mut self.data[bucket_index], &mut old_bucket);
@@ -479,7 +488,7 @@ where
                 &bucket.left,
                 &new_left_index,
                 &self.hasher,
-                |bucket: &Bucket<T, U>| &bucket.left,
+                |bucket: &Bucket<Left, Right>| &bucket.left,
                 &self.data[..bucket_index],
                 new_left_index.len(),
             )
@@ -488,7 +497,7 @@ where
                 &bucket.right,
                 &new_right_index,
                 &self.reverse_hasher,
-                |bucket: &Bucket<T, U>| &bucket.right,
+                |bucket: &Bucket<Left, Right>| &bucket.right,
                 &self.data[..bucket_index],
                 new_right_index.len(),
             )
@@ -510,13 +519,13 @@ where
     /// Get the right value for the given left value. If the left value is not in the map, None is
     /// returned.
     ///
-    /// The key may be any borrowed form of the map’s key type,
-    /// but Hash and Eq on the borrowed form must match those for the key type.
+    /// The key may be any borrowed form of the map’s left type,
+    /// but Hash and Eq on the borrowed form must match those for the left type.
     #[must_use]
-    pub fn get_right<R>(&self, left: &R) -> Option<&U>
+    pub fn get_right<Ref>(&self, left: &Ref) -> Option<&Right>
     where
-        T: Borrow<R>,
-        R: Hash + Eq + ?Sized,
+        Left: Borrow<Ref>,
+        Ref: Hash + Eq + ?Sized,
     {
         self.lookup_index_left(left)
             .ok()
@@ -527,13 +536,13 @@ where
     /// returned.
     /// This method is an alias for [`get_right`](#method.get_right).
     ///
-    /// The key may be any borrowed form of the map’s key type,
-    /// but Hash and Eq on the borrowed form must match those for the key type.
+    /// The key may be any borrowed form of the map’s left type,
+    /// but Hash and Eq on the borrowed form must match those for the left type.
     #[must_use]
-    pub fn get_by_left<R>(&self, left: &R) -> Option<&U>
+    pub fn get_by_left<Ref>(&self, left: &Ref) -> Option<&Right>
     where
-        T: Borrow<R>,
-        R: Hash + Eq + ?Sized,
+        Left: Borrow<Ref>,
+        Ref: Hash + Eq + ?Sized,
     {
         self.get_right(left)
     }
@@ -541,13 +550,13 @@ where
     /// Get the left value for the given right value. If the right value is not in the map, None is
     /// returned.
     ///
-    /// The key may be any borrowed form of the map’s key type,
-    /// but Hash and Eq on the borrowed form must match those for the key type.
+    /// The key may be any borrowed form of the map’s right type,
+    /// but Hash and Eq on the borrowed form must match those for the right type.
     #[must_use]
-    pub fn get_left<R>(&self, right: &R) -> Option<&T>
+    pub fn get_left<Ref>(&self, right: &Ref) -> Option<&Left>
     where
-        U: Borrow<R>,
-        R: Hash + Eq + ?Sized,
+        Right: Borrow<Ref>,
+        Ref: Hash + Eq + ?Sized,
     {
         self.lookup_index_right(right)
             .ok()
@@ -559,39 +568,39 @@ where
     /// This method is an alias for [`get_left`](#method.get_left).
     ///
     ///
-    /// The key may be any borrowed form of the map’s key type,
-    /// but Hash and Eq on the borrowed form must match those for the key type.
+    /// The key may be any borrowed form of the map’s right type,
+    /// but Hash and Eq on the borrowed form must match those for the right type.
     #[must_use]
-    pub fn get_by_right<R>(&self, right: &R) -> Option<&T>
+    pub fn get_by_right<Ref>(&self, right: &Ref) -> Option<&Left>
     where
-        U: Borrow<R>,
-        R: Hash + Eq + ?Sized,
+        Right: Borrow<Ref>,
+        Ref: Hash + Eq + ?Sized,
     {
         self.get_left(right)
     }
 
     /// Check if the map contains a mapping for the given left value.
     ///
-    /// The key may be any borrowed form of the map’s key type,
-    /// but Hash and Eq on the borrowed form must match those for the key type.
+    /// The key may be any borrowed form of the map’s left type,
+    /// but Hash and Eq on the borrowed form must match those for the left type.
     #[must_use]
-    pub fn contains_left<R>(&self, left: &R) -> bool
+    pub fn contains_left<Ref>(&self, left: &Ref) -> bool
     where
-        T: Borrow<R>,
-        R: Hash + Eq + ?Sized,
+        Left: Borrow<Ref>,
+        Ref: Hash + Eq + ?Sized,
     {
         self.lookup_index_left(left).is_ok()
     }
 
     /// Check if the map contains a mapping for the given right value.
     ///
-    /// The key may be any borrowed form of the map’s key type,
-    /// but Hash and Eq on the borrowed form must match those for the key type.
+    /// The key may be any borrowed form of the map’s right type,
+    /// but Hash and Eq on the borrowed form must match those for the right type.
     #[must_use]
-    pub fn contains_right<R>(&self, right: &R) -> bool
+    pub fn contains_right<Ref>(&self, right: &Ref) -> bool
     where
-        U: Borrow<R>,
-        R: Hash + Eq + ?Sized,
+        Right: Borrow<Ref>,
+        Ref: Hash + Eq + ?Sized,
     {
         self.lookup_index_right(right).is_ok()
     }
@@ -611,7 +620,7 @@ where
     /// both mappings will be updated, which will reduce the number of mappings by one (see [`len`]).
     ///
     /// [`len`]: #method.len
-    pub fn insert(&mut self, left: T, right: U) -> (Option<U>, Option<T>) {
+    pub fn insert(&mut self, left: Left, right: Right) -> (Option<Right>, Option<Left>) {
         if !self.can_fit(1) {
             self.grow();
         }
@@ -696,7 +705,11 @@ where
     // TODO adjust this method to mirror HashMap::try_insert (when it gets stabilized)
     //  this includes changing the Err to an occupied error type,
     //  and changing the name if Rust decides that try_ should be reserved to allocation errors
-    pub fn try_insert(&mut self, left: T, right: U) -> Result<(), (Option<&U>, Option<&T>)> {
+    pub fn try_insert(
+        &mut self,
+        left: Left,
+        right: Right,
+    ) -> Result<(), (Option<&Right>, Option<&Left>)> {
         let left_index = self.lookup_index_left(&left);
         let right_index = self.lookup_index_right(&right);
 
@@ -725,10 +738,13 @@ where
 
     /// Deletes the mappings for the given left value and returns the right value that was mapped to it.
     /// If the left value is not in the map, None is returned.
-    pub fn remove_left<R>(&mut self, left: &R) -> Option<U>
+    ///
+    /// The key may be any borrowed form of the map’s left type,
+    /// but Hash and Eq on the borrowed form must match those for the left type.
+    pub fn remove_left<Ref>(&mut self, left: &Ref) -> Option<Right>
     where
-        T: Borrow<R>,
-        R: Hash + Eq + ?Sized,
+        Left: Borrow<Ref>,
+        Ref: Hash + Eq + ?Sized,
     {
         let left_index = self.lookup_index_left(left);
         if let Ok(left_meta_index) = left_index {
@@ -744,10 +760,13 @@ where
 
     /// Deletes the mappings for the given right value and returns the left value that was mapped to it.
     /// If the right value is not in the map, None is returned.
-    pub fn remove_right<R>(&mut self, right: &R) -> Option<T>
+    ///
+    /// The key may be any borrowed form of the map’s right type,
+    /// but Hash and Eq on the borrowed form must match those for the right type.
+    pub fn remove_right<Ref>(&mut self, right: &Ref) -> Option<Left>
     where
-        U: Borrow<R>,
-        R: Hash + Eq + ?Sized,
+        Right: Borrow<Ref>,
+        Ref: Hash + Eq + ?Sized,
     {
         let right_index = self.lookup_index_right(right);
         if let Ok(right_meta_index) = right_index {
@@ -812,24 +831,24 @@ where
     }
 
     /// Returns an iterator over the mappings in the map in arbitrary order.
-    pub fn iter(&self) -> impl Iterator<Item = (&T, &U)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&Left, &Right)> {
         self.data.iter().map(|bucket| (&bucket.left, &bucket.right))
     }
 
     /// Returns an iterator over the left values in the map in arbitrary order.
-    pub fn left_values(&self) -> impl Iterator<Item = &T> {
+    pub fn left_values(&self) -> impl Iterator<Item = &Left> {
         self.data.iter().map(|bucket| &bucket.left)
     }
 
     /// Returns an iterator over the right values in the map in arbitrary order.
-    pub fn right_values(&self) -> impl Iterator<Item = &U> {
+    pub fn right_values(&self) -> impl Iterator<Item = &Right> {
         self.data.iter().map(|bucket| &bucket.right)
     }
 
     /// Clears the map, returning all value pairs as an iterator in arbitrary order.
     /// Keeps the allocated memory for reuse.
     /// The iterator keeps a mutable reference to the map.
-    pub fn drain<'s>(&'s mut self) -> impl Iterator<Item = (T, U)> + 's {
+    pub fn drain<'s>(&'s mut self) -> impl Iterator<Item = (Left, Right)> + 's {
         self.left_index.fill(EMPTY_SLOT);
         self.right_index.fill(EMPTY_SLOT);
         self.data
