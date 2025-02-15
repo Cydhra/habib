@@ -123,6 +123,9 @@ where
     /// and the lookup function to be passed in. It is not intended to be called directly, but rather
     /// through the lookup_index_left and lookup_index_right methods, or during rehashing.
     ///
+    /// The key may be any borrowed form of the map’s key type,
+    /// but Hash and Eq on the borrowed form must match those for the key type.
+    ///
     /// # Parameters
     /// * `element` - The element for which to find the index.
     /// * `hash_index` - The hash index to probe.
@@ -171,6 +174,9 @@ where
     /// It is not intended to be called directly, but rather through the lookup_index_left and
     /// lookup_index_right methods.
     ///
+    /// The key may be any borrowed form of the map’s key type,
+    /// but Hash and Eq on the borrowed form must match those for the key type.
+    ///
     /// # Arguments
     /// * `element` - The element to look up.
     /// * `ideal_index_func` - A function that returns the ideal index for the element type.
@@ -209,6 +215,9 @@ where
     /// is not in the map, the returned index is either empty or contains a bucket with a lower
     /// probe distance.
     ///
+    /// The key may be any borrowed form of the map’s key type,
+    /// but Hash and Eq on the borrowed form must match those for the key type.
+    ///
     /// # Arguments
     /// * `left` - The left value to look up.
     ///
@@ -234,6 +243,9 @@ where
     /// Find the index that the right value is stored at or would be stored at. If the right value
     /// is not in the map, the returned index is either empty or contains a bucket with a lower
     /// probe distance.
+    ///
+    /// The key may be any borrowed form of the map’s key type,
+    /// but Hash and Eq on the borrowed form must match those for the key type.
     ///
     /// # Arguments
     /// * `right` - The right value to look up.
@@ -497,6 +509,9 @@ where
 
     /// Get the right value for the given left value. If the left value is not in the map, None is
     /// returned.
+    ///
+    /// The key may be any borrowed form of the map’s key type,
+    /// but Hash and Eq on the borrowed form must match those for the key type.
     #[must_use]
     pub fn get_right<R>(&self, left: &R) -> Option<&U>
     where
@@ -511,6 +526,9 @@ where
     /// Get the right value for the given left value. If the left value is not in the map, None is
     /// returned.
     /// This method is an alias for [`get_right`](#method.get_right).
+    ///
+    /// The key may be any borrowed form of the map’s key type,
+    /// but Hash and Eq on the borrowed form must match those for the key type.
     #[must_use]
     pub fn get_by_left<R>(&self, left: &R) -> Option<&U>
     where
@@ -522,6 +540,9 @@ where
 
     /// Get the left value for the given right value. If the right value is not in the map, None is
     /// returned.
+    ///
+    /// The key may be any borrowed form of the map’s key type,
+    /// but Hash and Eq on the borrowed form must match those for the key type.
     #[must_use]
     pub fn get_left<R>(&self, right: &R) -> Option<&T>
     where
@@ -536,6 +557,10 @@ where
     /// Get the left value for the given right value. If the right value is not in the map, None is
     /// returned.
     /// This method is an alias for [`get_left`](#method.get_left).
+    ///
+    ///
+    /// The key may be any borrowed form of the map’s key type,
+    /// but Hash and Eq on the borrowed form must match those for the key type.
     #[must_use]
     pub fn get_by_right<R>(&self, right: &R) -> Option<&T>
     where
@@ -546,6 +571,9 @@ where
     }
 
     /// Check if the map contains a mapping for the given left value.
+    ///
+    /// The key may be any borrowed form of the map’s key type,
+    /// but Hash and Eq on the borrowed form must match those for the key type.
     #[must_use]
     pub fn contains_left<R>(&self, left: &R) -> bool
     where
@@ -556,6 +584,9 @@ where
     }
 
     /// Check if the map contains a mapping for the given right value.
+    ///
+    /// The key may be any borrowed form of the map’s key type,
+    /// but Hash and Eq on the borrowed form must match those for the key type.
     #[must_use]
     pub fn contains_right<R>(&self, right: &R) -> bool
     where
