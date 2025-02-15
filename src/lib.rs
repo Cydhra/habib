@@ -14,12 +14,12 @@ const EMPTY_SLOT: usize = usize::MAX;
 // TODO instead of linear searching, use smart search from https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=4568152
 /// A bi-directional map.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BiMap<T, U, H = RandomState, RH = RandomState>
+pub struct BiMap<Left, Right, H = RandomState, RH = RandomState>
 where
-    T: Hash + Eq,
-    U: Hash + Eq,
+    Left: Hash + Eq,
+    Right: Hash + Eq,
 {
-    data: Vec<Bucket<T, U>>,
+    data: Vec<Bucket<Left, Right>>,
     left_index: Box<[usize]>,
     right_index: Box<[usize]>,
     hasher: H,
@@ -27,25 +27,25 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct Bucket<T, U> {
-    left: T,
-    right: U,
+struct Bucket<Left, Right> {
+    left: Left,
+    right: Right,
 }
 
-impl<T, U> Default for BiMap<T, U>
+impl<Left, Right> Default for BiMap<Left, Right>
 where
-    T: Hash + Eq,
-    U: Hash + Eq,
+    Left: Hash + Eq,
+    Right: Hash + Eq,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T, U> BiMap<T, U>
+impl<Left, Right> BiMap<Left, Right>
 where
-    T: Hash + Eq,
-    U: Hash + Eq,
+    Left: Hash + Eq,
+    Right: Hash + Eq,
 {
     /// Create a new empty BiMap with the default capacity.
     pub fn new() -> Self {
