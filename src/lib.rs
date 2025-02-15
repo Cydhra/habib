@@ -404,6 +404,14 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
             .map(|index| &self.data[self.left_index[index]].right)
     }
 
+    /// Get the right value for the given left value. If the left value is not in the map, None is
+    /// returned.
+    /// This method is an alias for [`get_right`](#method.get_right).
+    #[must_use]
+    pub fn get_by_left(&self, left: &T) -> Option<&U> {
+        self.get_right(left)
+    }
+
     /// Get the left value for the given right value. If the right value is not in the map, None is
     /// returned.
     #[must_use]
@@ -411,6 +419,14 @@ impl<T, U, H, RH> BiMap<T, U, H, RH>
         self.lookup_index_right(right)
             .ok()
             .map(|index| &self.data[self.right_index[index]].left)
+    }
+
+    /// Get the left value for the given right value. If the right value is not in the map, None is
+    /// returned.
+    /// This method is an alias for [`get_left`](#method.get_left).
+    #[must_use]
+    pub fn get_by_right(&self, right: &U) -> Option<&T> {
+        self.get_left(right)
     }
 
     /// Check if the map contains a mapping for the given left value.
