@@ -779,4 +779,12 @@ pub fn test_decayed() {
     let other_key: &str = "b";
     assert_eq!(map.get_left(other_key), Some(&String::from("a")));
     assert_eq!(map.get_by_right(other_key), Some(&String::from("a")));
+
+    assert_eq!(map.contains_left(key), true);
+    assert_eq!(map.contains_right(key), false);
+    assert_eq!(map.contains_left(other_key), false);
+    assert_eq!(map.contains_right(other_key), true);
+
+    assert_eq!(map.remove_left(key), Some(String::from("b")));
+    assert_eq!(map.remove_right(other_key), None);
 }

@@ -547,13 +547,21 @@ where
 
     /// Check if the map contains a mapping for the given left value.
     #[must_use]
-    pub fn contains_left(&self, left: &T) -> bool {
+    pub fn contains_left<R>(&self, left: &R) -> bool
+    where
+        T: Borrow<R>,
+        R: Hash + Eq + ?Sized,
+    {
         self.lookup_index_left(left).is_ok()
     }
 
     /// Check if the map contains a mapping for the given right value.
     #[must_use]
-    pub fn contains_right(&self, right: &U) -> bool {
+    pub fn contains_right<R>(&self, right: &R) -> bool
+    where
+        U: Borrow<R>,
+        R: Hash + Eq + ?Sized,
+    {
         self.lookup_index_right(right).is_ok()
     }
 
@@ -686,7 +694,11 @@ where
 
     /// Deletes the mappings for the given left value and returns the right value that was mapped to it.
     /// If the left value is not in the map, None is returned.
-    pub fn remove_left(&mut self, left: &T) -> Option<U> {
+    pub fn remove_left<R>(&mut self, left: &R) -> Option<U>
+    where
+        T: Borrow<R>,
+        R: Hash + Eq + ?Sized,
+    {
         let left_index = self.lookup_index_left(left);
         if let Ok(left_meta_index) = left_index {
             let bucket = self.left_index[left_meta_index];
@@ -701,7 +713,11 @@ where
 
     /// Deletes the mappings for the given right value and returns the left value that was mapped to it.
     /// If the right value is not in the map, None is returned.
-    pub fn remove_right(&mut self, right: &U) -> Option<T> {
+    pub fn remove_right<R>(&mut self, right: &R) -> Option<T>
+    where
+        U: Borrow<R>,
+        R: Hash + Eq + ?Sized,
+    {
         let right_index = self.lookup_index_right(right);
         if let Ok(right_meta_index) = right_index {
             let bucket = self.right_index[right_meta_index];
