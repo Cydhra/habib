@@ -142,6 +142,7 @@ where
         hash_index: &[usize],
         hasher: &G,
         lookup: fn(&Bucket<Left, Right>) -> &E,
+        lookup_hash: fn(&Bucket<Left, Right>) -> u64,
         buckets: &[Bucket<Left, Right>],
         capacity: usize,
     ) -> Result<(u64, usize), (u64, usize)>
@@ -159,7 +160,7 @@ where
                 return Ok((hash, index));
             } else {
                 let target_probe_dist = index
-                    .wrapping_sub(Self::hash_to_index(hasher, lookup(bucket), capacity).1)
+                    .wrapping_sub(lookup_hash(bucket) as usize % capacity)
                     .rem_euclid(capacity);
                 if dist > target_probe_dist {
                     return Err((hash, index));
@@ -198,6 +199,7 @@ where
         hash_index: &[usize],
         hasher: &G,
         lookup: fn(&Bucket<Left, Right>) -> &E,
+        lookup_hash: fn(&Bucket<Left, Right>) -> u64,
     ) -> Result<(u64, usize), (u64, usize)>
     where
         E: Borrow<Ref> + Hash + Eq,
@@ -209,6 +211,7 @@ where
             hash_index,
             hasher,
             lookup,
+            lookup_hash,
             &self.data,
             self.current_capacity(),
         )
@@ -240,6 +243,7 @@ where
             &self.left_index,
             &self.hasher,
             |bucket: &Bucket<Left, Right>| &bucket.left,
+            |bucket: &Bucket<Left, Right>| bucket.left_hash,
         )
     }
 
@@ -269,6 +273,7 @@ where
             &self.right_index,
             &self.reverse_hasher,
             |bucket: &Bucket<Left, Right>| &bucket.right,
+            |bucket: &Bucket<Left, Right>| bucket.right_hash,
         )
     }
 
@@ -494,6 +499,7 @@ where
                 &new_left_index,
                 &self.hasher,
                 |bucket: &Bucket<Left, Right>| &bucket.left,
+                |bucket: &Bucket<Left, Right>| bucket.left_hash,
                 &self.data[..bucket_index],
                 new_left_index.len(),
             )
@@ -503,6 +509,7 @@ where
                 &new_right_index,
                 &self.reverse_hasher,
                 |bucket: &Bucket<Left, Right>| &bucket.right,
+                |bucket: &Bucket<Left, Right>| bucket.right_hash,
                 &self.data[..bucket_index],
                 new_right_index.len(),
             )
