@@ -564,13 +564,16 @@ fn test_move_bucket_during_replacement() {
     map.insert(3, 4);
 
     // verify the data structure looks like the test expects, otherwise the test case is broken
-    assert_eq!(map.data[0], Bucket { left: 1, right: 2 });
-    assert_eq!(map.data[1], Bucket { left: 3, right: 4 });
+    assert_eq!(map.data[0].left, 1);
+    assert_eq!(map.data[0].right, 2);
+    assert_eq!(map.data[1].left, 3);
+    assert_eq!(map.data[1].right, 4);
 
     map.insert(3, 2);
 
     // verify the data structure looks like the test expects, otherwise the test case is broken
-    assert_eq!(map.data[0], Bucket { left: 3, right: 2 });
+    assert_eq!(map.data[0].left, 3);
+    assert_eq!(map.data[0].right, 2);
 
     assert_eq!(map.get_right(&1), None);
     assert_eq!(map.get_right(&3), Some(&2));

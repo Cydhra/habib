@@ -30,6 +30,8 @@ where
 struct Bucket<Left, Right> {
     left: Left,
     right: Right,
+    left_hash: u64,
+    right_hash: u64,
 }
 
 impl<Left, Right> Default for BiMap<Left, Right>
@@ -94,28 +96,29 @@ where
     }
 
     /// Convert an element into an index by hashing it and mapping the hash to the given capacity
-    fn hash_to_index<E, G>(hasher: &G, element: &E, capacity: usize) -> usize
+    fn hash_to_index<E, G>(hasher: &G, element: &E, capacity: usize) -> (u64, usize)
     where
         E: Hash + ?Sized,
         G: BuildHasher,
     {
         let mut hasher = hasher.build_hasher();
         element.hash(&mut hasher);
-        hasher.finish() as usize % capacity
+        let hash = hasher.finish();
+        (hash, hash as usize % capacity)
     }
 
     /// Get the ideal index (i.e. without collisions) for a left value under the current
     /// container size.
     #[inline(always)]
     fn get_ideal_index_left(&self, left: &Left) -> usize {
-        Self::hash_to_index(&self.hasher, left, self.current_capacity())
+        Self::hash_to_index(&self.hasher, left, self.current_capacity()).1
     }
 
     /// Get the ideal index (i.e. without collisions) for a right value under the current
     /// container size.
     #[inline(always)]
     fn get_ideal_index_right(&self, right: &Right) -> usize {
-        Self::hash_to_index(&self.reverse_hasher, right, self.current_capacity())
+        Self::hash_to_index(&self.reverse_hasher, right, self.current_capacity()).1
     }
 
     /// Perform the probing algorithm on the given hash index to find the index of the element.
@@ -141,32 +144,32 @@ where
         lookup: fn(&Bucket<Left, Right>) -> &E,
         buckets: &[Bucket<Left, Right>],
         capacity: usize,
-    ) -> Result<usize, usize>
+    ) -> Result<(u64, usize), (u64, usize)>
     where
         E: Borrow<R> + Hash + Eq,
         R: Hash + Eq + ?Sized,
         G: BuildHasher,
     {
-        let ideal_index = Self::hash_to_index(hasher, element, capacity);
+        let (hash, ideal_index) = Self::hash_to_index(hasher, element, capacity);
         let mut index = ideal_index;
         let mut dist = 0;
         while hash_index[index] < EMPTY_SLOT {
             let bucket = &buckets[hash_index[index]];
             if lookup(bucket).borrow() == element {
-                return Ok(index);
+                return Ok((hash, index));
             } else {
                 let target_probe_dist = index
-                    .wrapping_sub(Self::hash_to_index(hasher, lookup(bucket), capacity))
+                    .wrapping_sub(Self::hash_to_index(hasher, lookup(bucket), capacity).1)
                     .rem_euclid(capacity);
                 if dist > target_probe_dist {
-                    return Err(index);
+                    return Err((hash, index));
                 }
             }
 
             index = (index + 1) % capacity;
             dist += 1;
         }
-        Err(index)
+        Err((hash, index))
     }
 
     /// Look up the index of an element in the map. This method is used for both left and right
@@ -195,7 +198,7 @@ where
         hash_index: &[usize],
         hasher: &G,
         lookup: fn(&Bucket<Left, Right>) -> &E,
-    ) -> Result<usize, usize>
+    ) -> Result<(u64, usize), (u64, usize)>
     where
         E: Borrow<Ref> + Hash + Eq,
         Ref: Hash + Eq + ?Sized,
@@ -227,7 +230,7 @@ where
     ///
     /// # Panics
     /// This method panics if the map is full.
-    fn lookup_index_left<Ref>(&self, left: &Ref) -> Result<usize, usize>
+    fn lookup_index_left<Ref>(&self, left: &Ref) -> Result<(u64, usize), (u64, usize)>
     where
         Left: Borrow<Ref>,
         Ref: Hash + Eq + ?Sized,
@@ -256,7 +259,7 @@ where
     ///
     /// # Panics
     /// This method panics if the map is full.
-    fn lookup_index_right<Ref>(&self, right: &Ref) -> Result<usize, usize>
+    fn lookup_index_right<Ref>(&self, right: &Ref) -> Result<(u64, usize), (u64, usize)>
     where
         Right: Borrow<Ref>,
         Ref: Hash + Eq + ?Sized,
@@ -317,7 +320,8 @@ where
         } else {
             self.delete_mapping_left(
                 self.lookup_index_left(&self.data[bucket_index].left)
-                    .unwrap(),
+                    .unwrap()
+                    .1,
             );
         }
 
@@ -326,7 +330,8 @@ where
         } else {
             self.delete_mapping_right(
                 self.lookup_index_right(&self.data[bucket_index].right)
-                    .unwrap(),
+                    .unwrap()
+                    .1,
             );
         }
 
@@ -349,8 +354,8 @@ where
         mem::swap(&mut lower[bucket_index], &mut upper[0]);
 
         // update metadata of moved bucket
-        self.left_index[left_index.unwrap()] = bucket_index;
-        self.right_index[right_index.unwrap()] = bucket_index;
+        self.left_index[left_index.unwrap().1] = bucket_index;
+        self.right_index[right_index.unwrap().1] = bucket_index;
 
         // return the deleted bucket
         self.data.pop().unwrap()
@@ -503,8 +508,8 @@ where
             )
             .unwrap_err();
 
-            Self::insert_mapping(&mut new_left_index, left_element_index, bucket_index);
-            Self::insert_mapping(&mut new_right_index, right_element_index, bucket_index);
+            Self::insert_mapping(&mut new_left_index, left_element_index.1, bucket_index);
+            Self::insert_mapping(&mut new_right_index, right_element_index.1, bucket_index);
         }
 
         self.left_index = new_left_index;
@@ -529,7 +534,7 @@ where
     {
         self.lookup_index_left(left)
             .ok()
-            .map(|index| &self.data[self.left_index[index]].right)
+            .map(|(_, index)| &self.data[self.left_index[index]].right)
     }
 
     /// Get the right value for the given left value. If the left value is not in the map, None is
@@ -560,7 +565,7 @@ where
     {
         self.lookup_index_right(right)
             .ok()
-            .map(|index| &self.data[self.right_index[index]].left)
+            .map(|(_, index)| &self.data[self.right_index[index]].left)
     }
 
     /// Get the left value for the given right value. If the right value is not in the map, None is
@@ -631,19 +636,23 @@ where
         let mut old_right = None;
         let mut old_left = None;
 
-        if let Ok(left_meta_index) = left_index {
+        if let Ok((left_hash, left_meta_index)) = left_index {
             // the bucket where the left element is currently stored, henceforth "the left bucket".
             let mut left_bucket = self.left_index[left_meta_index];
 
             // delete the right bucket if it exists and store the old left value
             // unless the right bucket is the same as the left bucket
-            if let Ok(right_meta_index) = right_index {
+            if let Ok((_, right_meta_index)) = right_index {
                 // the bucket where the right index is currently stored, henceforth "the right bucket".
                 let right_bucket = self.right_index[right_meta_index];
 
                 if left_bucket != right_bucket {
                     // delete the right bucket
-                    let bucket = self.delete_bucket(right_bucket, None, right_index.ok());
+                    let bucket = self.delete_bucket(
+                        right_bucket,
+                        None,
+                        right_index.ok().map(|(_, right_index)| right_index),
+                    );
 
                     // if the left bucket was moved to the right bucket's position, update the left index
                     if left_bucket == self.len() {
@@ -662,33 +671,61 @@ where
             // and insert that value
             self.delete_mapping_right(
                 self.lookup_index_right(&self.data[left_bucket].right)
-                    .unwrap(),
+                    .unwrap()
+                    .1,
             );
-            self.insert_mapping_right(self.lookup_index_right(&right).unwrap_err(), left_bucket);
+            let (right_hash, right_index) = self.lookup_index_right(&right).unwrap_err();
+            self.insert_mapping_right(right_index, left_bucket);
 
             // replace left bucket with new bucket, no update to left index necessary, since it
             // already points to this bucket.
-            let bucket = self.replace_bucket(left_bucket, Bucket { left, right });
+            let bucket = self.replace_bucket(
+                left_bucket,
+                Bucket {
+                    left,
+                    right,
+                    left_hash,
+                    right_hash,
+                },
+            );
             old_right = Some(bucket.right);
-        } else if let Ok(right_meta_index) = right_index {
+        } else if let Ok((right_hash, right_meta_index)) = right_index {
             let right_bucket = self.right_index[right_meta_index];
 
             // replace the right bucket with the new bucket, and delete the left mapping to it,
             // since we insert a new left mapping for the new value
             self.delete_mapping_left(
                 self.lookup_index_left(&self.data[right_bucket].left)
-                    .unwrap(),
+                    .unwrap()
+                    .1,
             );
 
             // insert mapping to the left index, no update to right index necessary.
-            self.insert_mapping_left(left_index.unwrap_err(), right_bucket);
-            let bucket = self.replace_bucket(right_bucket, Bucket { left, right });
+            let (left_hash, left_index) = left_index.unwrap_err();
+            self.insert_mapping_left(left_index, right_bucket);
+            let bucket = self.replace_bucket(
+                right_bucket,
+                Bucket {
+                    left,
+                    right,
+                    left_hash,
+                    right_hash,
+                },
+            );
             old_left = Some(bucket.left);
         } else {
+            let (left_hash, left_meta_index) = left_index.unwrap_err();
+            let (right_hash, right_meta_index) = right_index.unwrap_err();
+
             self.push_new_bucket(
-                Bucket { left, right },
-                left_index.unwrap_err(),
-                right_index.unwrap_err(),
+                Bucket {
+                    left,
+                    right,
+                    left_hash,
+                    right_hash,
+                },
+                left_meta_index,
+                right_meta_index,
             );
         }
 
@@ -718,20 +755,28 @@ where
                 self.grow();
             }
 
+            let (left_hash, left_index) = left_index.unwrap_err();
+            let (right_hash, right_index) = right_index.unwrap_err();
+
             self.push_new_bucket(
-                Bucket { left, right },
-                left_index.unwrap_err(),
-                right_index.unwrap_err(),
+                Bucket {
+                    left,
+                    right,
+                    left_hash,
+                    right_hash,
+                },
+                left_index,
+                right_index,
             );
             Ok(())
         } else {
             Err((
                 left_index
                     .ok()
-                    .map(|index| &self.data[self.left_index[index]].right),
+                    .map(|(_, index)| &self.data[self.left_index[index]].right),
                 right_index
                     .ok()
-                    .map(|index| &self.data[self.right_index[index]].left),
+                    .map(|(_, index)| &self.data[self.right_index[index]].left),
             ))
         }
     }
@@ -747,11 +792,11 @@ where
         Ref: Hash + Eq + ?Sized,
     {
         let left_index = self.lookup_index_left(left);
-        if let Ok(left_meta_index) = left_index {
+        if let Ok((_, left_meta_index)) = left_index {
             let bucket = self.left_index[left_meta_index];
 
             // delete the bucket
-            let bucket = self.delete_bucket(bucket, left_index.ok(), None);
+            let bucket = self.delete_bucket(bucket, Some(left_meta_index), None);
             Some(bucket.right)
         } else {
             None
@@ -769,11 +814,11 @@ where
         Ref: Hash + Eq + ?Sized,
     {
         let right_index = self.lookup_index_right(right);
-        if let Ok(right_meta_index) = right_index {
+        if let Ok((_, right_meta_index)) = right_index {
             let bucket = self.right_index[right_meta_index];
 
             // delete the bucket
-            let bucket = self.delete_bucket(bucket, None, right_index.ok());
+            let bucket = self.delete_bucket(bucket, None, Some(right_meta_index));
             Some(bucket.left)
         } else {
             None
