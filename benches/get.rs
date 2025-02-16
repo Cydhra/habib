@@ -5,6 +5,7 @@ use bijective_map::BiMap;
 use criterion::*;
 use permutation_iterator::Permutor;
 use rand::{thread_rng, RngCore};
+use std::collections::HashMap;
 
 fn bench_get(c: &mut Criterion) {
     let mut rng = thread_rng();
@@ -15,6 +16,8 @@ fn bench_get(c: &mut Criterion) {
     for load_factor in [0.5, 0.75, 0.8, 0.9] {
         for length in SIZES {
             let mut map = BiMap::with_capacity(length);
+            let mut std = HashMap::with_capacity(length);
+
             let mut permutor_left = Permutor::new_with_u64_key(u64::MAX, 1337).into_iter();
             let mut permutor_right = Permutor::new_with_u64_key(u64::MAX, 9773).into_iter();
 
@@ -23,6 +26,7 @@ fn bench_get(c: &mut Criterion) {
                 let left = permutor_left.next().unwrap();
                 let right = permutor_right.next().unwrap();
                 map.insert(left, right);
+                std.insert(left, right);
             }
 
             group.bench_with_input(
@@ -32,6 +36,18 @@ fn bench_get(c: &mut Criterion) {
                     b.iter_batched(
                         || rng.next_u64() % entire_length as u64,
                         |key| map.get_left(&key),
+                        BatchSize::SmallInput,
+                    );
+                },
+            );
+
+            group.bench_with_input(
+                BenchmarkId::new(format!("std_{}", load_factor), length),
+                &length,
+                |b, _| {
+                    b.iter_batched(
+                        || rng.next_u64() % entire_length as u64,
+                        |key| std.get(&key),
                         BatchSize::SmallInput,
                     );
                 },
