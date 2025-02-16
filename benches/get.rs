@@ -7,6 +7,8 @@ use permutation_iterator::Permutor;
 use rand::{thread_rng, RngCore};
 use std::collections::HashMap;
 
+// TODO this benchmark checks mainly for misses, we need another than checks for hits too
+// TODO the std hashmap results are super noisy, changing between runs up to 50% in runtime
 fn bench_get(c: &mut Criterion) {
     let mut rng = thread_rng();
 
