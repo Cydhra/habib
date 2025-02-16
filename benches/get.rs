@@ -15,12 +15,10 @@ fn bench_get(c: &mut Criterion) {
     for load_factor in [0.5, 0.75, 0.8, 0.9] {
         for length in SIZES {
             let mut map = BiMap::with_capacity(length);
-            let mut permutor_left =
-                Permutor::new_with_u64_key(u64::MAX, rng.next_u64()).into_iter();
-            let mut permutor_right =
-                Permutor::new_with_u64_key(u64::MAX, rng.next_u64()).into_iter();
+            let mut permutor_left = Permutor::new_with_u64_key(u64::MAX, 1337).into_iter();
+            let mut permutor_right = Permutor::new_with_u64_key(u64::MAX, 9773).into_iter();
 
-            let entire_length = (length as f64 * (load_factor / 0.9)) as usize;
+            let entire_length = (length as f64 * load_factor) as usize;
             for _ in 0..entire_length {
                 let left = permutor_left.next().unwrap();
                 let right = permutor_right.next().unwrap();

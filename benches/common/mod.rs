@@ -1,5 +1,4 @@
-pub const SIZES: [usize; 8] = [
-    1 << 10,
+pub const SIZES: [usize; 7] = [
     1 << 12,
     1 << 14,
     1 << 16,
